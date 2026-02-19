@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/identity/pet_identity.dart';
 
 /// Personality selection screen — the user chooses who their pet will be.
@@ -43,12 +44,21 @@ class _BirthScreenState extends State<BirthScreen> {
               Expanded(
                 child: ListView(
                   children: [
-                    for (final preset in PersonalityPreset.values)
+                    for (var i = 0; i < PersonalityPreset.values.length; i++)
                       _PresetCard(
-                        preset: preset,
-                        isSelected: _selected == preset,
-                        onTap: () => setState(() => _selected = preset),
-                      ),
+                        preset: PersonalityPreset.values[i],
+                        isSelected: _selected == PersonalityPreset.values[i],
+                        onTap: () => setState(
+                            () => _selected = PersonalityPreset.values[i]),
+                      )
+                          .animate()
+                          .fadeIn(
+                              delay: (100 * i).ms, duration: 400.ms)
+                          .slideX(
+                              begin: 0.1,
+                              end: 0,
+                              delay: (100 * i).ms,
+                              duration: 400.ms),
                     // Random option
                     _PresetCard(
                       preset: null,
@@ -57,7 +67,16 @@ class _BirthScreenState extends State<BirthScreen> {
                         _selected = null;
                         _hasExplicitlyChosen = true;
                       }),
-                    ),
+                    )
+                        .animate()
+                        .fadeIn(
+                            delay: (100 * PersonalityPreset.values.length).ms,
+                            duration: 400.ms)
+                        .slideX(
+                            begin: 0.1,
+                            end: 0,
+                            delay: (100 * PersonalityPreset.values.length).ms,
+                            duration: 400.ms),
                   ],
                 ),
               ),

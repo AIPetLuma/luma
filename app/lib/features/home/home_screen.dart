@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../data/models/pet_state.dart';
 import '../../data/models/diary_entry.dart';
+import '../../shared/l10n.dart';
 import 'pet_avatar.dart';
 import 'status_bar.dart';
 import 'diary_sheet.dart';
@@ -23,6 +25,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = L10n.of(context);
 
     return Scaffold(
       body: SafeArea(
@@ -44,7 +47,7 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Day ${petState.ageDays + 1}',
+                          t.day(petState.ageDays + 1),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -74,19 +77,28 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
+            )
+                .animate()
+                .fadeIn(duration: 800.ms)
+                .scale(
+                    begin: const Offset(0.9, 0.9),
+                    end: const Offset(1, 1),
+                    duration: 800.ms,
+                    curve: Curves.easeOutBack),
 
             // Emotion label
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                _emotionText(petState.emotion.label),
+                t.emotionText(petState.emotion.label),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontStyle: FontStyle.italic,
                 ),
               ),
-            ),
+            )
+                .animate()
+                .fadeIn(delay: 400.ms, duration: 500.ms),
 
             // Bottom bar: diary + chat
             Padding(
@@ -100,9 +112,7 @@ class HomeScreen extends StatelessWidget {
                           ? null
                           : () => _showDiary(context),
                       icon: const Icon(Icons.menu_book_outlined),
-                      label: Text(
-                        'Diary (${diaryEntries.length})',
-                      ),
+                      label: Text(t.diary(diaryEntries.length)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -112,12 +122,15 @@ class HomeScreen extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: onChatTap,
                       icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('Talk'),
+                      label: Text(t.talk),
                     ),
                   ),
                 ],
               ),
-            ),
+            )
+                .animate()
+                .fadeIn(delay: 600.ms, duration: 500.ms)
+                .slideY(begin: 0.3, end: 0, delay: 600.ms, duration: 500.ms),
           ],
         ),
       ),
@@ -131,18 +144,5 @@ class HomeScreen extends StatelessWidget {
       useSafeArea: true,
       builder: (_) => DiarySheet(entries: diaryEntries),
     );
-  }
-
-  String _emotionText(String label) {
-    return switch (label) {
-      'excited' => 'Feeling excited!',
-      'content' => 'Feeling content',
-      'curious' => 'Feeling curious',
-      'calm' => 'Feeling calm',
-      'anxious' => 'Feeling a bit anxious',
-      'melancholy' => 'Feeling low...',
-      'withdrawn' => 'Needs some space',
-      _ => 'Feeling okay',
-    };
   }
 }

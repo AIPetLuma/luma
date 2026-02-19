@@ -49,7 +49,14 @@ ship:
 	git branch -d $(branch) && \
 	git push origin --delete $(branch)
 
-# 4. 子模块+主仓库一键提交
+# 4. 平台配置（Android/iOS 权限 + Firebase 提醒）
+setup:
+	@echo ">>> 生成 Flutter 平台文件..."
+	cd app && flutter create . --org com.lumaai
+	@echo ">>> 配置平台权限..."
+	bash scripts/setup_platform.sh
+
+# 5. 子模块+主仓库一键提交
 sup:
 	@if [ -z "$(msg)" ]; then echo "Error: 请输入 msg='说明文字'"; exit 1; fi
 	@echo ">>> 正在同步子模块..."

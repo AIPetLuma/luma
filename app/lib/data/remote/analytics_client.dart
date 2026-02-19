@@ -1,52 +1,85 @@
+import 'package:flutter/foundation.dart';
+import 'package:mixpanel_flutter/mixpanel_flutter.dart';
+
 /// Analytics event tracking for the 21-day retention experiment.
 ///
 /// Events correspond to the 10 埋点 defined in
 /// `p0/03_21天留存实验设计.md`.
+///
+/// Wraps the Mixpanel SDK. If no token is configured or initialization
+/// fails, all calls are silently dropped (safe for dev/test).
 class AnalyticsClient {
-  // In production, this wraps Mixpanel. For now, a logging stub.
-  final void Function(String event, Map<String, dynamic> props)? _track;
+  Mixpanel? _mixpanel;
 
-  AnalyticsClient({
-    void Function(String event, Map<String, dynamic> props)? trackFn,
-  }) : _track = trackFn;
+  AnalyticsClient._();
+
+  /// Singleton instance.
+  static final AnalyticsClient instance = AnalyticsClient._();
+
+  /// Initialise Mixpanel with a project token.
+  ///
+  /// Call once at app startup. If [token] is empty or init fails,
+  /// the client stays in stub mode (events are no-ops).
+  Future<void> init(String token) async {
+    if (token.isEmpty) {
+      debugPrint('AnalyticsClient: no Mixpanel token — stub mode.');
+      return;
+    }
+    try {
+      _mixpanel = await Mixpanel.init(
+        token,
+        trackAutomaticEvents: true,
+      );
+      debugPrint('AnalyticsClient: Mixpanel initialised.');
+    } catch (e) {
+      debugPrint('AnalyticsClient: Mixpanel init failed ($e) — stub mode.');
+    }
+  }
+
+  /// Identify a user (pet owner) so events are attributed correctly.
+  void identify(String distinctId) {
+    _mixpanel?.identify(distinctId);
+  }
+
+  // ── 10 retention experiment events ──
 
   void signupCompleted({required String petId}) =>
-      _emit('signup_completed', {'pet_id': petId});
+      _track('signup_completed', {'pet_id': petId});
 
   void sessionStarted({required String petId}) =>
-      _emit('session_started', {'pet_id': petId});
+      _track('session_started', {'pet_id': petId});
 
   void sessionEnded({required String petId, required int durationSeconds}) =>
-      _emit('session_ended', {
+      _track('session_ended', {
         'pet_id': petId,
         'duration_s': durationSeconds,
       });
 
   void aiDisclosureShown({required String location}) =>
-      _emit('ai_disclosure_shown', {'location': location});
+      _track('ai_disclosure_shown', {'location': location});
 
   void riskSignalDetected({required int level, required String source}) =>
-      _emit('risk_signal_detected', {'level': level, 'source': source});
+      _track('risk_signal_detected', {'level': level, 'source': source});
 
   void riskLevelAssigned({required int level}) =>
-      _emit('risk_level_assigned', {'level': level});
+      _track('risk_level_assigned', {'level': level});
 
   void crisisResourceShown({required int level}) =>
-      _emit('crisis_resource_shown', {'level': level});
+      _track('crisis_resource_shown', {'level': level});
 
   void userReturnedD1({required String petId}) =>
-      _emit('user_returned_d1', {'pet_id': petId});
+      _track('user_returned_d1', {'pet_id': petId});
 
   void userReturnedD7({required String petId}) =>
-      _emit('user_returned_d7', {'pet_id': petId});
+      _track('user_returned_d7', {'pet_id': petId});
 
   void userReturnedD21({required String petId}) =>
-      _emit('user_returned_d21', {'pet_id': petId});
+      _track('user_returned_d21', {'pet_id': petId});
 
-  void _emit(String event, Map<String, dynamic> props) {
-    _track?.call(event, {
-      ...props,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
+  // ── Internal ──
+
+  void _track(String event, Map<String, dynamic> props) {
+    props['timestamp'] = DateTime.now().toIso8601String();
+    _mixpanel?.track(event, properties: props);
   }
 }

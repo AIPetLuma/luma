@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # Database
   sqflite: ^2.3.0
@@ -25,8 +27,11 @@ dependencies:
   # Background tasks
   workmanager: ^0.5.2
 
-  # Push notifications
+  # Firebase
+  firebase_core: ^2.25.0
   firebase_messaging: ^14.7.0
+
+  # Push notifications
   flutter_local_notifications: ^17.0.0
 
   # Analytics

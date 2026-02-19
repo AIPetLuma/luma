@@ -9,7 +9,10 @@ import '../features/chat/chat_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../providers/pet_provider.dart';
 import '../core/identity/pet_identity.dart';
+import '../data/local/secure_storage.dart';
+import '../data/remote/analytics_client.dart';
 import '../shared/constants.dart';
+import '../shared/l10n.dart';
 import '../features/chat/chat_controller.dart' as ctrl;
 
 /// Top-level router that decides which screen to show based on app state.
@@ -26,6 +29,7 @@ class _AppRouterState extends ConsumerState<AppRouter>
     with WidgetsBindingObserver {
   _Screen _screen = _Screen.loading;
   PersonalityPreset? _selectedPreset;
+  DateTime? _sessionStart;
 
   @override
   void initState() {
@@ -43,14 +47,26 @@ class _AppRouterState extends ConsumerState<AppRouter>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final engine = ref.read(lifeEngineProvider);
+    final analytics = AnalyticsClient.instance;
+    final petId = engine.state?.id;
+
     if (state == AppLifecycleState.paused) {
       engine.pause();
-      // Compress conversation on background.
       ref.read(chatControllerProvider).endSession();
+      // Track session duration.
+      if (petId != null && _sessionStart != null) {
+        final duration = DateTime.now().difference(_sessionStart!).inSeconds;
+        analytics.sessionEnded(petId: petId, durationSeconds: duration);
+        _sessionStart = null;
+      }
     } else if (state == AppLifecycleState.resumed) {
       engine.resume().then((_) {
         ref.read(petStateProvider.notifier).refresh();
       });
+      if (petId != null) {
+        _sessionStart = DateTime.now();
+        analytics.sessionStarted(petId: petId);
+      }
     }
   }
 
@@ -71,6 +87,13 @@ class _AppRouterState extends ConsumerState<AppRouter>
         // Pet exists but screen is still loading → go home.
         if (petState != null && _screen == _Screen.loading) {
           _screen = _Screen.home;
+          // Start session for returning user.
+          if (_sessionStart == null) {
+            _sessionStart = DateTime.now();
+            AnalyticsClient.instance.identify(petState.id);
+            AnalyticsClient.instance
+                .sessionStarted(petId: petState.id);
+          }
         }
 
         return AnimatedSwitcher(
@@ -111,6 +134,14 @@ class _AppRouterState extends ConsumerState<AppRouter>
                   name: name,
                   preset: _selectedPreset,
                 );
+            // Track signup + start first session.
+            final petId = ref.read(lifeEngineProvider).state?.id;
+            if (petId != null) {
+              AnalyticsClient.instance.signupCompleted(petId: petId);
+              AnalyticsClient.instance.identify(petId);
+              _sessionStart = DateTime.now();
+              AnalyticsClient.instance.sessionStarted(petId: petId);
+            }
             if (mounted) setState(() => _screen = _Screen.home);
           },
         );
@@ -126,6 +157,24 @@ class _AppRouterState extends ConsumerState<AppRouter>
           key: const ValueKey('settings'),
           petState: petState!,
           onBack: () => setState(() => _screen = _Screen.home),
+          onResetPet: () async {
+            final petDao = ref.read(petDaoProvider);
+            final chatDao = ref.read(chatDaoProvider);
+            final engine = ref.read(lifeEngineProvider);
+            engine.dispose();
+            if (petState != null) {
+              await chatDao.deleteAllForPet(petState.id);
+              await petDao.delete(petState.id);
+            }
+            if (mounted) {
+              setState(() => _screen = _Screen.onboardingDisclosure);
+            }
+            ref.invalidate(petStateProvider);
+          },
+          onApiKeyChanged: (key) async {
+            await SecureStorage.setApiKey(key);
+            ref.invalidate(apiKeyProvider);
+          },
         );
     }
   }
@@ -163,6 +212,8 @@ class _AppRouterState extends ConsumerState<AppRouter>
       showDisclosureReminder: needsReminder,
       onDisclosureDismissed: () {
         ref.read(lastDisclosureTimeProvider.notifier).state = DateTime.now();
+        AnalyticsClient.instance
+            .aiDisclosureShown(location: 'chat_reminder');
       },
       onSendMessage: (text) async {
         final result = await ref.read(chatControllerProvider).sendMessage(text);
@@ -208,7 +259,7 @@ class _LoadingScreen extends StatelessWidget {
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              'Luma is waking up...',
+              L10n.of(context).loading,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],

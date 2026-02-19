@@ -20,6 +20,12 @@ class PetDao {
     return PetState.fromMap(rows.first);
   }
 
+  /// Delete a pet by ID.
+  Future<void> delete(String petId) async {
+    final db = await _db;
+    await db.delete('pet_state', where: 'id = ?', whereArgs: [petId]);
+  }
+
   /// Persist the full state snapshot (called every tick).
   Future<void> update(PetState pet) async {
     final db = await _db;

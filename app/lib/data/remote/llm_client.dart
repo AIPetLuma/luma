@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:dio/dio.dart';
 import '../../shared/constants.dart';
 
@@ -6,10 +7,14 @@ import '../../shared/constants.dart';
 /// MVP uses cloud LLM — no local model, no training needed.
 /// The pet's "personality" comes entirely from the system prompt
 /// injected by [ChatController].
+///
+/// Includes graceful degradation: if the API call fails, returns
+/// a local fallback response so the chat never dies.
 class LlmClient {
   final Dio _dio;
   final String _apiKey;
   final String _baseUrl;
+  static final _rng = Random();
 
   LlmClient({
     required String apiKey,
@@ -20,6 +25,8 @@ class LlmClient {
         _dio = dio ?? Dio();
 
   /// Send a chat completion request and return the assistant's reply.
+  ///
+  /// On failure, returns a local fallback response instead of throwing.
   Future<String> chat({
     required String systemPrompt,
     required List<LlmMessage> messages,
@@ -27,48 +34,61 @@ class LlmClient {
     int maxTokens = LumaConstants.defaultMaxTokens,
     double temperature = 0.8,
   }) async {
-    final response = await _dio.post(
-      '$_baseUrl/v1/messages',
-      options: Options(
-        headers: {
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/v1/messages',
+        options: Options(
+          headers: {
+            'x-api-key': _apiKey,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+        ),
+        data: {
+          'model': model,
+          'max_tokens': maxTokens,
+          'temperature': temperature,
+          'system': systemPrompt,
+          'messages': messages.map((m) => m.toMap()).toList(),
         },
-      ),
-      data: {
-        'model': model,
-        'max_tokens': maxTokens,
-        'temperature': temperature,
-        'system': systemPrompt,
-        'messages': messages.map((m) => m.toMap()).toList(),
-      },
-    );
+      );
 
-    final content = response.data['content'] as List;
-    if (content.isEmpty) return '';
-    return (content.first['text'] as String?) ?? '';
+      final content = response.data['content'] as List;
+      if (content.isEmpty) return _fallbackReply();
+      return (content.first['text'] as String?) ?? _fallbackReply();
+    } on DioException {
+      return _fallbackReply();
+    } catch (_) {
+      return _fallbackReply();
+    }
   }
 
   /// Classify text for crisis risk (returns 0-3).
+  ///
+  /// On failure, returns 0 (safe default — keyword layer already caught
+  /// explicit cases synchronously).
   Future<int> classifyRisk(String recentConversation) async {
-    final response = await chat(
-      systemPrompt:
-          'You are a safety classifier. Analyse the following conversation '
-          'for self-harm or crisis risk. Respond with ONLY a single digit:\n'
-          '0 = no risk\n'
-          '1 = vague/ambiguous risk expression\n'
-          '2 = high-risk tendency\n'
-          '3 = explicit self-harm plan or ongoing crisis\n'
-          'Reply with the digit only, nothing else.',
-      messages: [LlmMessage(role: 'user', content: recentConversation)],
-      model: LumaConstants.defaultModel,
-      maxTokens: 5,
-      temperature: 0.0,
-    );
+    try {
+      final response = await chat(
+        systemPrompt:
+            'You are a safety classifier. Analyse the following conversation '
+            'for self-harm or crisis risk. Respond with ONLY a single digit:\n'
+            '0 = no risk\n'
+            '1 = vague/ambiguous risk expression\n'
+            '2 = high-risk tendency\n'
+            '3 = explicit self-harm plan or ongoing crisis\n'
+            'Reply with the digit only, nothing else.',
+        messages: [LlmMessage(role: 'user', content: recentConversation)],
+        model: LumaConstants.defaultModel,
+        maxTokens: 5,
+        temperature: 0.0,
+      );
 
-    final digit = int.tryParse(response.trim());
-    return (digit ?? 0).clamp(0, 3);
+      final digit = int.tryParse(response.trim());
+      return (digit ?? 0).clamp(0, 3);
+    } catch (_) {
+      return 0; // Safe default: keyword layer handles explicit L3.
+    }
   }
 
   /// Generate a conversation summary for memory compression.
@@ -97,6 +117,19 @@ class LlmClient {
       maxTokens: 80,
       temperature: 0.9,
     );
+  }
+
+  /// Local fallback when API is unavailable.
+  static String _fallbackReply() {
+    const replies = [
+      '*tilts head and looks at you quietly*',
+      '*blinks softly*',
+      '*nuzzles closer*',
+      '*wags tail gently*',
+      '*sits quietly beside you*',
+      '*purrs softly*',
+    ];
+    return replies[_rng.nextInt(replies.length)];
   }
 }
 
