@@ -44,6 +44,13 @@ class ChatDao {
     return (result.first['cnt'] as num).toInt();
   }
 
+  /// Delete all messages for a pet (used on reset).
+  Future<void> deleteAllForPet(String petId) async {
+    final db = await _db;
+    await db.delete('chat_messages', where: 'pet_id = ?', whereArgs: [petId]);
+    await db.delete('diary_entries', where: 'pet_id = ?', whereArgs: [petId]);
+  }
+
   // ── Diary entries ──
 
   Future<int> insertDiaryEntry(DiaryEntry entry) async {

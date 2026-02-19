@@ -9,6 +9,7 @@ import '../features/chat/chat_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../providers/pet_provider.dart';
 import '../core/identity/pet_identity.dart';
+import '../data/local/secure_storage.dart';
 import '../shared/constants.dart';
 import '../features/chat/chat_controller.dart' as ctrl;
 
@@ -126,6 +127,24 @@ class _AppRouterState extends ConsumerState<AppRouter>
           key: const ValueKey('settings'),
           petState: petState!,
           onBack: () => setState(() => _screen = _Screen.home),
+          onResetPet: () async {
+            final petDao = ref.read(petDaoProvider);
+            final chatDao = ref.read(chatDaoProvider);
+            final engine = ref.read(lifeEngineProvider);
+            engine.dispose();
+            if (petState != null) {
+              await chatDao.deleteAllForPet(petState.id);
+              await petDao.delete(petState.id);
+            }
+            if (mounted) {
+              setState(() => _screen = _Screen.onboardingDisclosure);
+            }
+            ref.invalidate(petStateProvider);
+          },
+          onApiKeyChanged: (key) async {
+            await SecureStorage.setApiKey(key);
+            ref.invalidate(apiKeyProvider);
+          },
         );
     }
   }

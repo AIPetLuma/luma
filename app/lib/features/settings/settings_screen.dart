@@ -6,12 +6,42 @@ import '../../shared/constants.dart';
 class SettingsScreen extends StatelessWidget {
   final PetState petState;
   final VoidCallback onBack;
+  final VoidCallback onResetPet;
+  final ValueChanged<String> onApiKeyChanged;
 
   const SettingsScreen({
     super.key,
     required this.petState,
     required this.onBack,
+    required this.onResetPet,
+    required this.onApiKeyChanged,
   });
+
+  void _confirmReset(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset pet?'),
+        content: const Text(
+          'This will permanently delete your Luma and all conversation '
+          'history. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onResetPet();
+            },
+            child: const Text('Reset', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,12 +99,34 @@ class SettingsScreen extends StatelessWidget {
 
           const Divider(height: 32),
 
+          // API key section
+          _SectionHeader(title: 'API key'),
+          _ApiKeyTile(onApiKeyChanged: onApiKeyChanged),
+
+          const Divider(height: 32),
+
           // Data section
           _SectionHeader(title: 'Data & privacy'),
           _InfoTile(
             icon: Icons.storage_outlined,
             title: 'All data stays on your device',
             subtitle: 'No cloud backup in this version',
+          ),
+
+          const SizedBox(height: 16),
+
+          // Reset pet button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: OutlinedButton.icon(
+              onPressed: () => _confirmReset(context),
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              label: const Text('Reset pet',
+                  style: TextStyle(color: Colors.red)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red),
+              ),
+            ),
           ),
 
           const SizedBox(height: 32),
@@ -131,6 +183,71 @@ class _InfoTile extends StatelessWidget {
       leading: Icon(icon),
       title: Text(title),
       subtitle: Text(subtitle),
+    );
+  }
+}
+
+class _ApiKeyTile extends StatefulWidget {
+  final ValueChanged<String> onApiKeyChanged;
+
+  const _ApiKeyTile({required this.onApiKeyChanged});
+
+  @override
+  State<_ApiKeyTile> createState() => _ApiKeyTileState();
+}
+
+class _ApiKeyTileState extends State<_ApiKeyTile> {
+  final _controller = TextEditingController();
+  bool _obscure = true;
+  bool _saved = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final key = _controller.text.trim();
+    if (key.isEmpty) return;
+    widget.onApiKeyChanged(key);
+    setState(() => _saved = true);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _saved = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _controller,
+            obscureText: _obscure,
+            decoration: InputDecoration(
+              labelText: 'Anthropic API key',
+              hintText: 'sk-ant-...',
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _save,
+              icon: Icon(_saved ? Icons.check : Icons.save_outlined),
+              label: Text(_saved ? 'Saved' : 'Save API key'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

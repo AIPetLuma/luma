@@ -71,7 +71,7 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 - Riverpod 状态管理：所有 Provider 定义 + PetStateNotifier
 - AppRouter：生命周期感知（pause/resume 触发引擎 + 会话压缩）
 
-### Phase C — 集成层（当前 commit）
+### Phase C — 集成层
 - **isInteracting 修正** — LifeEngine 新增 `isUserInteracting` 标志，AppRouter 在进入/退出聊天时切换，tick 现在正确传递
 - **url_launcher** — CrisisCard 的 Call/Text 按钮现在能拨打 988 或发短信
 - **SecureStorage** — API key 从 flutter_secure_storage 读取（Keychain/EncryptedSharedPrefs），回退到编译时 env
@@ -81,22 +81,30 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 - **main.dart** — 启动时初始化通知 + 注册后台任务
 - **pubspec.yaml** — 新增 url_launcher、flutter_secure_storage
 
+### Phase D — 质量保证（当前 commit）
+- **Unit tests** — NeedSystem (9 tests)、EmotionSystem (8 tests)、CrisisDetector (8 tests)、LifeEngine (5 tests) 已在 Phase A 编写
+- **Widget tests** — 新增 3 个 widget 测试文件：
+  - `onboarding_test.dart` — AI 披露文本/按钮、性格选择、名称验证
+  - `crisis_card_test.dart` — L3/L2/L1 卡片渲染
+  - `settings_screen_test.dart` — 宠物信息、AI 披露、危机资源
+- **LLM 降级策略** — `LlmClient.chat()` 现在 try/catch 包装，API 失败时返回本地手势回复（`*tilts head*` 等），`classifyRisk()` 失败时返回 0（安全默认值，关键词层保底）
+- **Settings 页面补全** — 新增 API key 输入界面（TextField + 保存按钮）、重置宠物按钮（确认对话框）
+- **DAO 补全** — `PetDao.delete()`、`ChatDao.deleteAllForPet()` 用于重置流程
+- **AppRouter 接线** — Settings 的 `onResetPet` 删除数据并回到 onboarding，`onApiKeyChanged` 写入 SecureStorage 并刷新 provider
+
 ## 下一步工作（按优先级）
 
-### Phase D — 应该做（质量保证 + 上线前）
+### Phase E — 应该做（上线前）
 1. **Firebase 平台配置** — 添加 google-services.json (Android) + GoogleService-Info.plist (iOS)，取消 main.dart 中注释
-2. **Unit tests** — NeedSystem, EmotionSystem, CrisisDetector, TimeSimulator（核心引擎必须有测试覆盖）
-3. **Widget tests** — onboarding 完整流程、危机卡片显示、聊天发送流程
-4. **LLM 降级策略** — API 调用失败时的本地兜底回复（不能让聊天死在那里）
-5. **AnalyticsClient 接入 Mixpanel** — 当前是 stub，需要对接真实 SDK
-6. **Settings 页面补全** — 删除数据/重置宠物、API key 输入界面
+2. **AnalyticsClient 接入 Mixpanel** — 当前是 stub，需要对接真实 SDK
+3. **集成测试** — 端到端 onboarding → chat → settings 完整流程
 
-### Phase E — 可以做（增强体验）
-7. **Google Fonts** — 自定义字体
-8. **flutter_animate** — 页面转场动画
-9. **Supabase** — 云端备份（可选）
-10. **i18n** — 中英文支持
-11. **深色主题微调** — 当前用 Material3 自动生成，可手动调色
+### Phase F — 可以做（增强体验）
+4. **Google Fonts** — 自定义字体
+5. **flutter_animate** — 页面转场动画
+6. **Supabase** — 云端备份（可选）
+7. **i18n** — 中英文支持
+8. **深色主题微调** — 当前用 Material3 自动生成，可手动调色
 
 ## 关键设计决策（不要改）
 
