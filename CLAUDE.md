@@ -43,9 +43,11 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 │   ├── Luma_AI宠物创业报告_更新版.md
 │   ├── Luma_MVP代码开发计划_2026-02-18.md
 │   └── p0/                # NY/CA 合规映射、危机干预手册、留存实验设计
+├── scripts/
+│   └── setup_platform.sh   # Android/iOS 权限配置脚本
 ├── CLAUDE.md               # 本文件
 ├── .gitmodules
-├── Makefile
+├── Makefile                 # 新增 `make setup` 目标
 └── LICENSE (MIT)
 ```
 
@@ -81,7 +83,7 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 - **main.dart** — 启动时初始化通知 + 注册后台任务
 - **pubspec.yaml** — 新增 url_launcher、flutter_secure_storage
 
-### Phase D — 质量保证（当前 commit）
+### Phase D — 质量保证
 - **Unit tests** — NeedSystem (9 tests)、EmotionSystem (8 tests)、CrisisDetector (8 tests)、LifeEngine (5 tests) 已在 Phase A 编写
 - **Widget tests** — 新增 3 个 widget 测试文件：
   - `onboarding_test.dart` — AI 披露文本/按钮、性格选择、名称验证
@@ -92,19 +94,34 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 - **DAO 补全** — `PetDao.delete()`、`ChatDao.deleteAllForPet()` 用于重置流程
 - **AppRouter 接线** — Settings 的 `onResetPet` 删除数据并回到 onboarding，`onApiKeyChanged` 写入 SecureStorage 并刷新 provider
 
+### Phase E — 上线前准备（当前 commit）
+- **Firebase 初始化** — `firebase_core` 加入依赖，`main.dart` 启动时 try/catch 初始化（无配置文件时 graceful fallback）
+- **Mixpanel 接入** — `AnalyticsClient` 从 stub 升级为 `mixpanel_flutter` 真实封装（singleton，token 通过 `--dart-define MIXPANEL_TOKEN` 注入，空 token 自动降级 stub 模式）
+- **10 个埋点完整接线**：
+  - `signup_completed` — 宠物出生后触发
+  - `session_started` / `session_ended` — App 生命周期 resume/pause 自动追踪（含时长）
+  - `ai_disclosure_shown` — onboarding + 聊天中每 3 小时提醒
+  - `risk_signal_detected` / `risk_level_assigned` — 危机检测触发时
+  - `crisis_resource_shown` — L1/L2/L3 资源卡展示时
+  - D1/D7/D21 留存事件已定义，等服务端对接
+- **集成测试** — `test/integration/app_flow_test.dart`，8 个测试覆盖完整流程：
+  - 完整 onboarding 流转（disclosure → birth → name → home）
+  - home → chat → home 转场 + 披露提醒验证
+  - home → settings → home 转场 + 合规内容验证
+  - settings reset → 回到 onboarding
+  - 聊天输入栏/发送按钮验证
+  - 合规内容验证（AI 披露、危机资源、988/741741）
+- **平台配置脚本** — `scripts/setup_platform.sh` + Makefile `make setup` 一键生成并配置 Android/iOS 权限
+- **pubspec.yaml** — 新增 `firebase_core: ^2.25.0`
+
 ## 下一步工作（按优先级）
 
-### Phase E — 应该做（上线前）
-1. **Firebase 平台配置** — 添加 google-services.json (Android) + GoogleService-Info.plist (iOS)，取消 main.dart 中注释
-2. **AnalyticsClient 接入 Mixpanel** — 当前是 stub，需要对接真实 SDK
-3. **集成测试** — 端到端 onboarding → chat → settings 完整流程
-
 ### Phase F — 可以做（增强体验）
-4. **Google Fonts** — 自定义字体
-5. **flutter_animate** — 页面转场动画
-6. **Supabase** — 云端备份（可选）
-7. **i18n** — 中英文支持
-8. **深色主题微调** — 当前用 Material3 自动生成，可手动调色
+1. **Google Fonts** — 自定义字体
+2. **flutter_animate** — 页面转场动画
+3. **Supabase** — 云端备份（可选）
+4. **i18n** — 中英文支持
+5. **深色主题微调** — 当前用 Material3 自动生成，可手动调色
 
 ## 关键设计决策（不要改）
 
@@ -115,21 +132,14 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 5. **PersonalityPreset** — 出生时固定，只通过 PersonalityEvolver 缓慢漂移（0.002/次）
 6. **CrisisCard 审计日志在 initState** — 保证每次展示只记录一次（不在 build 中）
 
-## 平台配置待完成
+## 平台配置（`make setup` 一键完成）
 
-### Android
-- `android/app/src/main/AndroidManifest.xml` 需要添加：
-  ```xml
-  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-  <queries>
-    <intent><action android:name="android.intent.action.DIAL"/></intent>
-    <intent><action android:name="android.intent.action.SENDTO"/></intent>
-  </queries>
-  ```
+运行 `make setup` 会执行 `flutter create .` 生成平台文件，然后自动配置权限。
 
-### iOS
-- `ios/Runner/Info.plist` 需要添加 `LSApplicationQueriesSchemes`（tel, sms）
-- `ios/Runner/GoogleService-Info.plist` — Firebase 配置
+### 仍需手动添加
+- `android/app/google-services.json` — Firebase Console 下载
+- `ios/Runner/GoogleService-Info.plist` — Firebase Console 下载
+- Mixpanel token — 构建时传入 `--dart-define MIXPANEL_TOKEN=xxx`
 
 ## 开发分支
 
@@ -141,6 +151,9 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 - flutter_riverpod: 2.5.0
 - sqflite: 2.3.0
 - dio: 5.4.0
+- firebase_core: 2.25.0
+- firebase_messaging: 14.7.0
+- mixpanel_flutter: 2.2.0
 - url_launcher: 6.2.0
 - flutter_secure_storage: 9.0.0
 - workmanager: 0.5.2

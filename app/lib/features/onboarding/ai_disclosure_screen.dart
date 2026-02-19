@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/safety/audit_logger.dart';
+import '../../data/remote/analytics_client.dart';
 
 /// First screen every user sees — legally required AI identity disclosure.
 ///
@@ -99,6 +100,8 @@ class AiDisclosureScreen extends StatelessWidget {
                     await AuditLogger().logDisclosureShown(
                       location: 'onboarding',
                     );
+                    AnalyticsClient.instance
+                        .aiDisclosureShown(location: 'onboarding');
                     onAccepted();
                   },
                   child: const Text('I understand'),

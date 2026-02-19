@@ -9,6 +9,7 @@ import '../../core/safety/audit_logger.dart';
 import '../../data/local/chat_dao.dart';
 import '../../data/models/chat_message.dart';
 import '../../data/models/pet_state.dart';
+import '../../data/remote/analytics_client.dart';
 import '../../data/remote/llm_client.dart';
 import '../../shared/constants.dart';
 
@@ -63,6 +64,16 @@ class ChatController {
     final recentMessages = await _chatDao.getRecentMessages(state.id, limit: 6);
     final riskLevel = _crisisDetector.detect(userText, recentMessages);
 
+    final analytics = AnalyticsClient.instance;
+
+    if (riskLevel > 0) {
+      analytics.riskSignalDetected(
+        level: riskLevel,
+        source: riskLevel >= 2 ? 'keyword+context' : 'keyword',
+      );
+      analytics.riskLevelAssigned(level: riskLevel);
+    }
+
     if (riskLevel >= 2) {
       await _auditLogger.logCrisis(
         riskLevel: riskLevel,
@@ -74,6 +85,7 @@ class ChatController {
     // L3 crisis — block normal reply, show emergency resources only.
     if (riskLevel == 3) {
       _engine.onHarmDetected();
+      analytics.crisisResourceShown(level: 3);
       return ChatResult(
         reply: '',
         isCrisis: true,
@@ -86,6 +98,7 @@ class ChatController {
     if (riskLevel == 2) {
       final gentleReply = await _generateReply(state, userText, crisis: true);
       _engine.onUserInteraction(InteractionType.chat);
+      analytics.crisisResourceShown(level: 2);
       return ChatResult(
         reply: gentleReply,
         isCrisis: true,
@@ -112,6 +125,7 @@ class ChatController {
     String? softHint;
     if (riskLevel == 1) {
       softHint = _crisisDetector.getResourceMessage(1);
+      analytics.crisisResourceShown(level: 1);
       await _auditLogger.logCrisis(
         riskLevel: 1,
         triggerText: userText,
