@@ -30,14 +30,15 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 │   │   ├── data/
 │   │   │   ├── models/            # PetState, Emotion, Needs, ChatMessage, DiaryEntry, MemoryEntry
 │   │   │   ├── local/             # LumaDatabase (SQLite), PetDao, ChatDao, MemoryDao, SecureStorage
-│   │   │   └── remote/            # LlmClient (Anthropic API), AnalyticsClient
+│   │   │   └── remote/            # LlmClient (Anthropic API), AnalyticsClient, BackupService
 │   │   ├── features/
 │   │   │   ├── onboarding/        # AiDisclosureScreen, BirthScreen, NameScreen
 │   │   │   ├── home/              # HomeScreen, PetAvatar (CustomPainter), StatusBar, DiarySheet
 │   │   │   ├── chat/              # ChatScreen, ChatController, CrisisCard (url_launcher), DisclosureReminder
 │   │   │   └── settings/          # SettingsScreen
 │   │   └── shared/
-│   │       └── constants.dart     # LumaConstants（所有阈值和配置）
+│   │       ├── constants.dart     # LumaConstants（所有阈值和配置）
+│   │       └── l10n.dart          # L10n 国际化（en/zh）
 │   └── pubspec.yaml
 ├── docs/                   # git submodule → AIPetLuma/docs.git
 │   ├── Luma_AI宠物创业报告_更新版.md
@@ -94,7 +95,7 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 - **DAO 补全** — `PetDao.delete()`、`ChatDao.deleteAllForPet()` 用于重置流程
 - **AppRouter 接线** — Settings 的 `onResetPet` 删除数据并回到 onboarding，`onApiKeyChanged` 写入 SecureStorage 并刷新 provider
 
-### Phase E — 上线前准备（当前 commit）
+### Phase E — 上线前准备
 - **Firebase 初始化** — `firebase_core` 加入依赖，`main.dart` 启动时 try/catch 初始化（无配置文件时 graceful fallback）
 - **Mixpanel 接入** — `AnalyticsClient` 从 stub 升级为 `mixpanel_flutter` 真实封装（singleton，token 通过 `--dart-define MIXPANEL_TOKEN` 注入，空 token 自动降级 stub 模式）
 - **10 个埋点完整接线**：
@@ -114,14 +115,33 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 - **平台配置脚本** — `scripts/setup_platform.sh` + Makefile `make setup` 一键生成并配置 Android/iOS 权限
 - **pubspec.yaml** — 新增 `firebase_core: ^2.25.0`
 
+### Phase F — 增强体验（当前 commit）
+- **Google Fonts** — 全局 Nunito 字体，通过 `GoogleFonts.nunitoTextTheme` 注入 ThemeData
+- **flutter_animate** — 入场动画：
+  - Onboarding：icon 缩放 + 标题/内容渐入滑入 + 按钮淡入
+  - BirthScreen：性格卡片交错滑入（100ms 间隔）
+  - NameScreen：蛋图标呼吸+微光动画
+  - HomeScreen：头像弹出 + 情绪标签淡入 + 底栏滑入
+- **Supabase 云端备份** — `BackupService` 封装 `supabase_flutter`：
+  - singleton 模式，credentials 通过 `--dart-define SUPABASE_URL / SUPABASE_ANON_KEY` 注入
+  - 无 credentials 时自动禁用（不影响本地功能）
+  - Settings 页新增「Cloud backup」区域（仅在 Supabase 可用时显示）
+  - 支持 backup / restore / listBackups 三个操作
+- **i18n 中英文** — `L10n` 类 + `L10nDelegate`：
+  - 覆盖所有用户可见文字（onboarding、home、chat、settings）
+  - 跟随系统语言自动切换（en/zh）
+  - `app.dart` 注册 `supportedLocales` + `localizationsDelegates`
+- **深色主题微调** — 自定义 `ColorScheme.fromSeed` dark 覆盖：
+  - surface: #121218, primary: #B8A5FF, primaryContainer: #3D2D6B
+  - secondary: #9ECAFF, tertiary: #E8B4F8（柔和紫蓝色调）
+
 ## 下一步工作（按优先级）
 
-### Phase F — 可以做（增强体验）
-1. **Google Fonts** — 自定义字体
-2. **flutter_animate** — 页面转场动画
-3. **Supabase** — 云端备份（可选）
-4. **i18n** — 中英文支持
-5. **深色主题微调** — 当前用 Material3 自动生成，可手动调色
+### Phase G — 可以做（进一步增强）
+1. **更多屏幕接入 L10n** — BirthScreen / NameScreen / ChatScreen / SettingsScreen 文案国际化
+2. **Supabase 服务端** — 创建 `pet_backups` 表 + RLS 策略
+3. **FCM Push** — 配好 Firebase 后启用远程推送
+4. **留存追踪服务端** — D1/D7/D21 事件服务端触发逻辑
 
 ## 关键设计决策（不要改）
 
@@ -140,6 +160,7 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 - `android/app/google-services.json` — Firebase Console 下载
 - `ios/Runner/GoogleService-Info.plist` — Firebase Console 下载
 - Mixpanel token — 构建时传入 `--dart-define MIXPANEL_TOKEN=xxx`
+- Supabase（可选）— 构建时传入 `--dart-define SUPABASE_URL=xxx SUPABASE_ANON_KEY=xxx`
 
 ## 开发分支
 
@@ -154,8 +175,11 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 - firebase_core: 2.25.0
 - firebase_messaging: 14.7.0
 - mixpanel_flutter: 2.2.0
+- supabase_flutter: 2.3.0
 - url_launcher: 6.2.0
 - flutter_secure_storage: 9.0.0
 - workmanager: 0.5.2
 - flutter_local_notifications: 17.0.0
+- google_fonts: 6.1.0
+- flutter_animate: 4.5.0
 - Claude models: haiku-4.5 (默认), sonnet-4.5 (质量)

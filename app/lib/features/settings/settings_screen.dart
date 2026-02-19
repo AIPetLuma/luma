@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/models/pet_state.dart';
+import '../../data/remote/backup_service.dart';
 import '../../shared/constants.dart';
 
 /// Settings screen — account, AI disclosure review, data controls.
@@ -105,12 +106,21 @@ class SettingsScreen extends StatelessWidget {
 
           const Divider(height: 32),
 
+          // Cloud backup section (only shown when Supabase is configured)
+          if (BackupService.instance.isAvailable) ...[
+            _SectionHeader(title: 'Cloud backup'),
+            _BackupTile(petState: petState),
+            const Divider(height: 32),
+          ],
+
           // Data section
           _SectionHeader(title: 'Data & privacy'),
           _InfoTile(
             icon: Icons.storage_outlined,
             title: 'All data stays on your device',
-            subtitle: 'No cloud backup in this version',
+            subtitle: BackupService.instance.isAvailable
+                ? 'Optional cloud backup available'
+                : 'No cloud backup in this version',
           ),
 
           const SizedBox(height: 16),
@@ -244,6 +254,64 @@ class _ApiKeyTileState extends State<_ApiKeyTile> {
               onPressed: _save,
               icon: Icon(_saved ? Icons.check : Icons.save_outlined),
               label: Text(_saved ? 'Saved' : 'Save API key'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BackupTile extends StatefulWidget {
+  final PetState petState;
+  const _BackupTile({required this.petState});
+
+  @override
+  State<_BackupTile> createState() => _BackupTileState();
+}
+
+class _BackupTileState extends State<_BackupTile> {
+  bool _busy = false;
+  String? _status;
+
+  Future<void> _backup() async {
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    final ok = await BackupService.instance.backup(widget.petState);
+    if (mounted) {
+      setState(() {
+        _busy = false;
+        _status = ok ? 'Backed up!' : 'Backup failed';
+      });
+      if (_status != null) {
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) setState(() => _status = null);
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: _busy ? null : _backup,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.cloud_upload_outlined),
+              label: Text(_status ?? 'Back up to cloud'),
             ),
           ),
         ],

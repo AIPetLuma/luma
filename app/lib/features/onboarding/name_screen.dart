@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 /// Final onboarding step — the user names their pet.
 class NameScreen extends StatefulWidget {
@@ -61,14 +62,20 @@ class _NameScreenState extends State<NameScreen> {
                   size: 56,
                   color: theme.colorScheme.primary,
                 ),
-              ),
+              )
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .scaleXY(begin: 1.0, end: 1.05, duration: 1500.ms)
+                  .then()
+                  .shimmer(duration: 1200.ms, color: theme.colorScheme.primary.withValues(alpha: 0.3)),
               const SizedBox(height: 32),
 
               Text(
                 'What will you call your companion?',
                 style: theme.textTheme.titleLarge,
                 textAlign: TextAlign.center,
-              ),
+              )
+                  .animate()
+                  .fadeIn(delay: 300.ms, duration: 500.ms),
               const SizedBox(height: 8),
               Text(
                 'Choose carefully — this name is part of who they are.',

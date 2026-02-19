@@ -5,6 +5,7 @@ import 'app.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/background_service.dart';
 import 'data/remote/analytics_client.dart';
+import 'data/remote/backup_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,15 +18,17 @@ void main() async {
   try {
     await Firebase.initializeApp();
   } catch (_) {
-    // Firebase config not yet available — local-only mode.
     debugPrint('Firebase init skipped (no platform config).');
   }
 
   // Mixpanel analytics — token from compile-time env.
-  // Pass MIXPANEL_TOKEN via --dart-define when building.
-  // Empty token → stub mode (no events sent).
   const mixpanelToken = String.fromEnvironment('MIXPANEL_TOKEN');
   await AnalyticsClient.instance.init(mixpanelToken);
+
+  // Supabase cloud backup (optional) — credentials from compile-time env.
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  await BackupService.instance.init(url: supabaseUrl, anonKey: supabaseAnonKey);
 
   // Initialise local notifications (permission request on first launch).
   await NotificationService.init();

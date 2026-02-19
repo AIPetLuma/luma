@@ -12,6 +12,7 @@ import '../core/identity/pet_identity.dart';
 import '../data/local/secure_storage.dart';
 import '../data/remote/analytics_client.dart';
 import '../shared/constants.dart';
+import '../shared/l10n.dart';
 import '../features/chat/chat_controller.dart' as ctrl;
 
 /// Top-level router that decides which screen to show based on app state.
@@ -258,7 +259,7 @@ class _LoadingScreen extends StatelessWidget {
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              'Luma is waking up...',
+              L10n.of(context).loading,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],
