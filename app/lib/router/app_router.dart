@@ -138,7 +138,10 @@ class _AppRouterState extends ConsumerState<AppRouter>
       key: const ValueKey('home'),
       petState: petState,
       diaryEntries: entries,
-      onChatTap: () => setState(() => _screen = _Screen.chat),
+      onChatTap: () => setState(() {
+        ref.read(lifeEngineProvider).isUserInteracting = true;
+        _screen = _Screen.chat;
+      }),
       onSettingsTap: () => setState(() => _screen = _Screen.settings),
     );
   }
@@ -174,7 +177,10 @@ class _AppRouterState extends ConsumerState<AppRouter>
           emotion: result.emotion,
         );
       },
-      onBack: () => setState(() => _screen = _Screen.home),
+      onBack: () => setState(() {
+        ref.read(lifeEngineProvider).isUserInteracting = false;
+        _screen = _Screen.home;
+      }),
     );
   }
 }

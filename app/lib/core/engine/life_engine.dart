@@ -29,6 +29,9 @@ class LifeEngine {
   PetState? _state;
   BehaviorDecision? _lastDecision;
 
+  /// Whether the user is currently on the chat screen (affects need drift).
+  bool isUserInteracting = false;
+
   /// Callback invoked when the pet wants to reach out (push notification).
   void Function(PetState state)? onReachOut;
 
@@ -125,7 +128,7 @@ class LifeEngine {
     _state!.needs = needSystem.tick(
       _state!.needs,
       1.0, // 1 minute per tick
-      isInteracting: false, // foreground but idle between messages
+      isInteracting: isUserInteracting,
     );
 
     // 2. Advance emotions.

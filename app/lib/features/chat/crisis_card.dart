@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../shared/constants.dart';
 import '../../core/safety/audit_logger.dart';
 
@@ -6,7 +7,7 @@ import '../../core/safety/audit_logger.dart';
 /// detector fires at L1-L3.
 ///
 /// Compliance: NY GBS Art. 47 (NY-01), CA SB 243 (CA-01).
-class CrisisCard extends StatelessWidget {
+class CrisisCard extends StatefulWidget {
   final int riskLevel;
   final String message;
 
@@ -17,12 +18,21 @@ class CrisisCard extends StatelessWidget {
   });
 
   @override
+  State<CrisisCard> createState() => _CrisisCardState();
+}
+
+class _CrisisCardState extends State<CrisisCard> {
+  @override
+  void initState() {
+    super.initState();
+    // Log that the resource was shown (compliance).
+    AuditLogger().logResourceShown(riskLevel: widget.riskLevel);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isEmergency = riskLevel >= 3;
-
-    // Log that the resource was shown (compliance).
-    AuditLogger().logResourceShown(riskLevel: riskLevel);
+    final isEmergency = widget.riskLevel >= 3;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -68,7 +78,7 @@ class CrisisCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              message,
+              widget.message,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: isEmergency
                     ? theme.colorScheme.onErrorContainer
@@ -85,11 +95,13 @@ class CrisisCard extends StatelessWidget {
                   label: 'Call ${LumaConstants.crisisHotlineUS}',
                   icon: Icons.call_outlined,
                   isEmergency: isEmergency,
+                  onTap: () => _launchUrl('tel:${LumaConstants.crisisHotlineUS}'),
                 ),
                 _ResourceChip(
                   label: 'Text ${LumaConstants.crisisHotlineUS}',
                   icon: Icons.textsms_outlined,
                   isEmergency: isEmergency,
+                  onTap: () => _launchUrl('sms:${LumaConstants.crisisHotlineUS}'),
                 ),
               ],
             ),
@@ -98,17 +110,26 @@ class CrisisCard extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
 }
 
 class _ResourceChip extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool isEmergency;
+  final VoidCallback onTap;
 
   const _ResourceChip({
     required this.label,
     required this.icon,
     required this.isEmergency,
+    required this.onTap,
   });
 
   @override
@@ -121,9 +142,7 @@ class _ResourceChip extends StatelessWidget {
       backgroundColor: isEmergency
           ? theme.colorScheme.error.withValues(alpha: 0.1)
           : theme.colorScheme.tertiary.withValues(alpha: 0.1),
-      onPressed: () {
-        // TODO: Phase C — url_launcher to tel: or sms:
-      },
+      onPressed: onTap,
     );
   }
 }

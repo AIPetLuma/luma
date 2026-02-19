@@ -15,25 +15,26 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 /home/user/luma/
 ├── app/                    # Flutter 应用
 │   ├── lib/
-│   │   ├── main.dart       # 入口（ProviderScope 包裹）
+│   │   ├── main.dart       # 入口（ProviderScope + 通知初始化 + WorkManager）
 │   │   ├── app.dart        # MaterialApp + M3 主题
 │   │   ├── router/
 │   │   │   └── app_router.dart    # 状态驱动路由（onboarding → home ↔ chat/settings）
 │   │   ├── providers/
-│   │   │   └── pet_provider.dart  # Riverpod：所有 Provider 定义
+│   │   │   └── pet_provider.dart  # Riverpod：所有 Provider 定义 + SecureStorage API key
 │   │   ├── core/
 │   │   │   ├── engine/            # LifeEngine, NeedSystem, EmotionSystem, BehaviorDecider, TimeSimulator
 │   │   │   ├── identity/          # PetIdentity (birth factory), Personality (evolution)
 │   │   │   ├── memory/            # MemoryManager (L1/L2/L3)
-│   │   │   └── safety/            # CrisisDetector (2层), AuditLogger, RiskClassifier
+│   │   │   ├── safety/            # CrisisDetector (2层), AuditLogger, RiskClassifier
+│   │   │   └── services/          # BackgroundService (WorkManager), NotificationService (local push)
 │   │   ├── data/
 │   │   │   ├── models/            # PetState, Emotion, Needs, ChatMessage, DiaryEntry, MemoryEntry
-│   │   │   ├── local/             # LumaDatabase (SQLite), PetDao, ChatDao, MemoryDao
+│   │   │   ├── local/             # LumaDatabase (SQLite), PetDao, ChatDao, MemoryDao, SecureStorage
 │   │   │   └── remote/            # LlmClient (Anthropic API), AnalyticsClient
 │   │   ├── features/
 │   │   │   ├── onboarding/        # AiDisclosureScreen, BirthScreen, NameScreen
-│   │   │   ├── home/              # HomeScreen, PetAvatar, StatusBar, DiarySheet
-│   │   │   ├── chat/              # ChatScreen, ChatController, CrisisCard, DisclosureReminder
+│   │   │   ├── home/              # HomeScreen, PetAvatar (CustomPainter), StatusBar, DiarySheet
+│   │   │   ├── chat/              # ChatScreen, ChatController, CrisisCard (url_launcher), DisclosureReminder
 │   │   │   └── settings/          # SettingsScreen
 │   │   └── shared/
 │   │       └── constants.dart     # LumaConstants（所有阈值和配置）
@@ -42,6 +43,7 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 │   ├── Luma_AI宠物创业报告_更新版.md
 │   ├── Luma_MVP代码开发计划_2026-02-18.md
 │   └── p0/                # NY/CA 合规映射、危机干预手册、留存实验设计
+├── CLAUDE.md               # 本文件
 ├── .gitmodules
 ├── Makefile
 └── LICENSE (MIT)
@@ -63,33 +65,38 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 
 ### Phase B — UI 层（commit 2d63993）
 - 入职流程：AI 披露（不可跳过）→ 性格选择 → 命名
-- 主页：宠物头像（情绪驱动颜色/大小/emoji）、4维需求条、日记底部弹窗
+- 主页：宠物头像（情绪驱动）、4维需求条、日记底部弹窗
 - 聊天：消息气泡、情绪标签、内联危机卡片、定时 AI 披露提醒
 - 设置：宠物信息、AI 披露复查、危机资源、隐私说明
 - Riverpod 状态管理：所有 Provider 定义 + PetStateNotifier
 - AppRouter：生命周期感知（pause/resume 触发引擎 + 会话压缩）
 
+### Phase C — 集成层（当前 commit）
+- **isInteracting 修正** — LifeEngine 新增 `isUserInteracting` 标志，AppRouter 在进入/退出聊天时切换，tick 现在正确传递
+- **url_launcher** — CrisisCard 的 Call/Text 按钮现在能拨打 988 或发短信
+- **SecureStorage** — API key 从 flutter_secure_storage 读取（Keychain/EncryptedSharedPrefs），回退到编译时 env
+- **BackgroundService** — WorkManager 每15分钟触发后台 tick，loneliness > 0.8 时弹出本地通知
+- **NotificationService** — 封装 flutter_local_notifications 初始化 + 权限请求 + 显示
+- **PetAvatar 重写** — CustomPainter 绘制呼吸动画球体：径向渐变、唤醒度驱动粒子、效价驱动表情（眼睛/嘴巴）
+- **main.dart** — 启动时初始化通知 + 注册后台任务
+- **pubspec.yaml** — 新增 url_launcher、flutter_secure_storage
+
 ## 下一步工作（按优先级）
 
-### Phase C — 必须做（MVP 可运行）
-1. **NeedSystem.tick() 的 isInteracting 参数** — 当前 provider 只传了 false，需要在 ChatController 交互时标记
-2. **WorkManager 后台任务** — 离线时 push 通知（loneliness > 0.8 时触发）
-3. **Firebase 初始化** — main.dart 中需要 `Firebase.initializeApp()`
-4. **API key 安全存储** — 当前用 `String.fromEnvironment`，应改为 `flutter_secure_storage` 或 `.env`
-5. **Rive/Lottie 动画** — 替换 PetAvatar 中的 emoji placeholder
-6. **url_launcher** — CrisisCard 中的 call/text 按钮目前是空 onPressed
-
-### Phase D — 应该做（质量保证）
-7. **Unit tests** — NeedSystem, EmotionSystem, CrisisDetector, TimeSimulator
-8. **Widget tests** — 关键流程：onboarding 完整流程、危机卡片显示
-9. **AnalyticsClient** — Mixpanel 集成
-10. **错误处理** — LLM 调用失败时的降级策略
+### Phase D — 应该做（质量保证 + 上线前）
+1. **Firebase 平台配置** — 添加 google-services.json (Android) + GoogleService-Info.plist (iOS)，取消 main.dart 中注释
+2. **Unit tests** — NeedSystem, EmotionSystem, CrisisDetector, TimeSimulator（核心引擎必须有测试覆盖）
+3. **Widget tests** — onboarding 完整流程、危机卡片显示、聊天发送流程
+4. **LLM 降级策略** — API 调用失败时的本地兜底回复（不能让聊天死在那里）
+5. **AnalyticsClient 接入 Mixpanel** — 当前是 stub，需要对接真实 SDK
+6. **Settings 页面补全** — 删除数据/重置宠物、API key 输入界面
 
 ### Phase E — 可以做（增强体验）
-11. **Google Fonts** — 自定义字体
-12. **flutter_animate** — 页面转场动画
-13. **Supabase** — 云端备份（可选）
-14. **i18n** — 中英文支持
+7. **Google Fonts** — 自定义字体
+8. **flutter_animate** — 页面转场动画
+9. **Supabase** — 云端备份（可选）
+10. **i18n** — 中英文支持
+11. **深色主题微调** — 当前用 Material3 自动生成，可手动调色
 
 ## 关键设计决策（不要改）
 
@@ -98,6 +105,23 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 3. **关键词层保证100%召回** — L3 关键词触发时直接阻断回复，不等 LLM
 4. **本地优先** — 所有数据存设备端 SQLite，不上传云端（MVP 阶段）
 5. **PersonalityPreset** — 出生时固定，只通过 PersonalityEvolver 缓慢漂移（0.002/次）
+6. **CrisisCard 审计日志在 initState** — 保证每次展示只记录一次（不在 build 中）
+
+## 平台配置待完成
+
+### Android
+- `android/app/src/main/AndroidManifest.xml` 需要添加：
+  ```xml
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+  <queries>
+    <intent><action android:name="android.intent.action.DIAL"/></intent>
+    <intent><action android:name="android.intent.action.SENDTO"/></intent>
+  </queries>
+  ```
+
+### iOS
+- `ios/Runner/Info.plist` 需要添加 `LSApplicationQueriesSchemes`（tel, sms）
+- `ios/Runner/GoogleService-Info.plist` — Firebase 配置
 
 ## 开发分支
 
@@ -109,4 +133,8 @@ Luma 是一款 **AI 宠物陪伴 app**（Flutter/Dart），核心理念："它�
 - flutter_riverpod: 2.5.0
 - sqflite: 2.3.0
 - dio: 5.4.0
+- url_launcher: 6.2.0
+- flutter_secure_storage: 9.0.0
+- workmanager: 0.5.2
+- flutter_local_notifications: 17.0.0
 - Claude models: haiku-4.5 (默认), sonnet-4.5 (质量)
