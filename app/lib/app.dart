@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'shared/constants.dart';
+import 'router/app_router.dart';
 
-/// Root widget. Routing and theme will be expanded as UI screens are built.
+/// Root widget with Material 3 theming.
 class LumaApp extends StatelessWidget {
   const LumaApp({super.key});
 
@@ -20,24 +20,7 @@ class LumaApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.dark,
       ),
-      home: const _PlaceholderHome(),
-    );
-  }
-}
-
-/// Temporary home screen — will be replaced by onboarding/home router.
-class _PlaceholderHome extends StatelessWidget {
-  const _PlaceholderHome();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Text(
-          'Luma is waking up...',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-      ),
+      home: const AppRouter(),
     );
   }
 }
