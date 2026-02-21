@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/safety/audit_logger.dart';
+import '../../shared/l10n.dart';
 
 /// Periodic reminder that Luma is AI (shown every 3 hours).
 ///
@@ -12,6 +13,7 @@ class DisclosureReminder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = L10n.of(context);
 
     // Log that the disclosure was shown (compliance).
     AuditLogger().logDisclosureShown(location: 'chat_reminder');
@@ -37,7 +39,7 @@ class DisclosureReminder extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Reminder: Luma is an AI companion, not a human or real animal.',
+              t.disclosureReminder,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

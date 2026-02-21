@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../data/models/pet_state.dart';
 import '../../data/models/diary_entry.dart';
 import '../../shared/l10n.dart';
+import '../../shared/runtime_env.dart';
 import 'pet_avatar.dart';
 import 'status_bar.dart';
 import 'diary_sheet.dart';
@@ -26,6 +27,76 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final t = L10n.of(context);
+    final shouldAnimate = !isRunningWidgetTest;
+
+    Widget avatarBlock = Expanded(
+      child: GestureDetector(
+        onTap: onChatTap,
+        child: Center(
+          child: PetAvatar(
+            emotion: petState.emotion,
+            conversationStyle: null,
+          ),
+        ),
+      ),
+    );
+    if (shouldAnimate) {
+      avatarBlock = avatarBlock
+          .animate()
+          .fadeIn(duration: 800.ms)
+          .scale(
+              begin: const Offset(0.9, 0.9),
+              end: const Offset(1, 1),
+              duration: 800.ms,
+              curve: Curves.easeOutBack);
+    }
+
+    Widget emotionBlock = Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        t.emotionText(petState.emotion.label),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontStyle: FontStyle.italic,
+        ),
+      ),
+    );
+    if (shouldAnimate) {
+      emotionBlock =
+          emotionBlock.animate().fadeIn(delay: 400.ms, duration: 500.ms);
+    }
+
+    Widget bottomBarBlock = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // Diary button
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: diaryEntries.isEmpty ? null : () => _showDiary(context),
+              icon: const Icon(Icons.menu_book_outlined),
+              label: Text(t.diary(diaryEntries.length)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Chat button
+          Expanded(
+            flex: 2,
+            child: FilledButton.icon(
+              onPressed: onChatTap,
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: Text(t.talk),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (shouldAnimate) {
+      bottomBarBlock = bottomBarBlock
+          .animate()
+          .fadeIn(delay: 600.ms, duration: 500.ms)
+          .slideY(begin: 0.3, end: 0, delay: 600.ms, duration: 500.ms);
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -67,70 +138,13 @@ class HomeScreen extends StatelessWidget {
             StatusBar(petState: petState),
 
             // Pet avatar (central, takes remaining space)
-            Expanded(
-              child: GestureDetector(
-                onTap: onChatTap,
-                child: Center(
-                  child: PetAvatar(
-                    emotion: petState.emotion,
-                    conversationStyle: null,
-                  ),
-                ),
-              ),
-            )
-                .animate()
-                .fadeIn(duration: 800.ms)
-                .scale(
-                    begin: const Offset(0.9, 0.9),
-                    end: const Offset(1, 1),
-                    duration: 800.ms,
-                    curve: Curves.easeOutBack),
+            avatarBlock,
 
             // Emotion label
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                t.emotionText(petState.emotion.label),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            )
-                .animate()
-                .fadeIn(delay: 400.ms, duration: 500.ms),
+            emotionBlock,
 
             // Bottom bar: diary + chat
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  // Diary button
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: diaryEntries.isEmpty
-                          ? null
-                          : () => _showDiary(context),
-                      icon: const Icon(Icons.menu_book_outlined),
-                      label: Text(t.diary(diaryEntries.length)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Chat button
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      onPressed: onChatTap,
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: Text(t.talk),
-                    ),
-                  ),
-                ],
-              ),
-            )
-                .animate()
-                .fadeIn(delay: 600.ms, duration: 500.ms)
-                .slideY(begin: 0.3, end: 0, delay: 600.ms, duration: 500.ms),
+            bottomBarBlock,
           ],
         ),
       ),

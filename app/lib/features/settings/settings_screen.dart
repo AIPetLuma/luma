@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/pet_state.dart';
 import '../../data/remote/backup_service.dart';
 import '../../shared/constants.dart';
+import '../../shared/l10n.dart';
 
 /// Settings screen — account, AI disclosure review, data controls.
 class SettingsScreen extends StatelessWidget {
@@ -19,25 +20,25 @@ class SettingsScreen extends StatelessWidget {
   });
 
   void _confirmReset(BuildContext context) {
+    final t = L10n.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reset pet?'),
-        content: const Text(
-          'This will permanently delete your Luma and all conversation '
-          'history. This action cannot be undone.',
+        title: Text(t.resetConfirmTitle),
+        content: Text(
+          t.resetConfirmBody,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(t.cancel),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               onResetPet();
             },
-            child: const Text('Reset', style: TextStyle(color: Colors.red)),
+            child: Text(t.reset, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -47,6 +48,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = L10n.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -54,73 +56,79 @@ class SettingsScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back),
           onPressed: onBack,
         ),
-        title: const Text('Settings'),
+        title: Text(t.settings),
         centerTitle: true,
       ),
       body: ListView(
         children: [
           // Pet info section
-          _SectionHeader(title: 'Your Luma'),
+          _SectionHeader(title: t.yourLuma),
           _InfoTile(
             icon: Icons.pets,
             title: petState.name,
-            subtitle: 'Day ${petState.ageDays + 1} together',
+            subtitle: t.dayTogether(petState.ageDays + 1),
           ),
           _InfoTile(
             icon: Icons.shield_outlined,
-            title: 'Trust score',
+            title: t.trustScore,
             subtitle: '${(petState.trustScore * 100).round()}%',
           ),
           _InfoTile(
             icon: Icons.chat_outlined,
-            title: 'Total interactions',
+            title: t.totalInteractions,
             subtitle: '${petState.totalInteractions}',
           ),
 
           const Divider(height: 32),
 
           // AI Disclosure section (compliance: always accessible)
-          _SectionHeader(title: 'About Luma'),
-          _DisclosureTile(theme: theme),
+          _SectionHeader(title: t.aboutLuma),
+          _DisclosureTile(theme: theme, t: t),
 
           const Divider(height: 32),
 
           // Crisis resources (always accessible)
-          _SectionHeader(title: 'Crisis resources'),
+          _SectionHeader(title: t.crisisResources),
           _InfoTile(
             icon: Icons.call_outlined,
-            title: '988 Suicide & Crisis Lifeline',
-            subtitle: 'Call or text ${LumaConstants.crisisHotlineUS}',
+            title: t.crisisLifeline,
+            subtitle: t.callOrText(LumaConstants.crisisHotlineUS),
           ),
           _InfoTile(
             icon: Icons.textsms_outlined,
-            title: 'Crisis Text Line',
+            title: t.crisisTextLine,
             subtitle: LumaConstants.crisisTextLine,
           ),
 
           const Divider(height: 32),
 
           // API key section
-          _SectionHeader(title: 'API key'),
-          _ApiKeyTile(onApiKeyChanged: onApiKeyChanged),
+          _SectionHeader(title: t.apiKey),
+          _ApiKeyTile(
+            onApiKeyChanged: onApiKeyChanged,
+            t: t,
+          ),
 
           const Divider(height: 32),
 
           // Cloud backup section (only shown when Supabase is configured)
           if (BackupService.instance.isAvailable) ...[
-            _SectionHeader(title: 'Cloud backup'),
-            _BackupTile(petState: petState),
+            _SectionHeader(title: t.cloudBackup),
+            _BackupTile(
+              petState: petState,
+              t: t,
+            ),
             const Divider(height: 32),
           ],
 
           // Data section
-          _SectionHeader(title: 'Data & privacy'),
+          _SectionHeader(title: t.dataPrivacy),
           _InfoTile(
             icon: Icons.storage_outlined,
-            title: 'All data stays on your device',
+            title: t.dataLocal,
             subtitle: BackupService.instance.isAvailable
-                ? 'Optional cloud backup available'
-                : 'No cloud backup in this version',
+                ? t.optionalCloudBackup
+                : t.noCloudBackup,
           ),
 
           const SizedBox(height: 16),
@@ -131,8 +139,10 @@ class SettingsScreen extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => _confirmReset(context),
               icon: const Icon(Icons.delete_outline, color: Colors.red),
-              label: const Text('Reset pet',
-                  style: TextStyle(color: Colors.red)),
+              label: Text(
+                t.resetPet,
+                style: const TextStyle(color: Colors.red),
+              ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Colors.red),
               ),
@@ -199,8 +209,12 @@ class _InfoTile extends StatelessWidget {
 
 class _ApiKeyTile extends StatefulWidget {
   final ValueChanged<String> onApiKeyChanged;
+  final L10n t;
 
-  const _ApiKeyTile({required this.onApiKeyChanged});
+  const _ApiKeyTile({
+    required this.onApiKeyChanged,
+    required this.t,
+  });
 
   @override
   State<_ApiKeyTile> createState() => _ApiKeyTileState();
@@ -238,8 +252,8 @@ class _ApiKeyTileState extends State<_ApiKeyTile> {
             controller: _controller,
             obscureText: _obscure,
             decoration: InputDecoration(
-              labelText: 'Anthropic API key',
-              hintText: 'sk-ant-...',
+              labelText: widget.t.anthropicApiKey,
+              hintText: widget.t.apiKeyHint,
               border: const OutlineInputBorder(),
               suffixIcon: IconButton(
                 icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
@@ -253,7 +267,7 @@ class _ApiKeyTileState extends State<_ApiKeyTile> {
             child: FilledButton.icon(
               onPressed: _save,
               icon: Icon(_saved ? Icons.check : Icons.save_outlined),
-              label: Text(_saved ? 'Saved' : 'Save API key'),
+              label: Text(_saved ? widget.t.saved : widget.t.saveApiKey),
             ),
           ),
         ],
@@ -264,7 +278,12 @@ class _ApiKeyTileState extends State<_ApiKeyTile> {
 
 class _BackupTile extends StatefulWidget {
   final PetState petState;
-  const _BackupTile({required this.petState});
+  final L10n t;
+
+  const _BackupTile({
+    required this.petState,
+    required this.t,
+  });
 
   @override
   State<_BackupTile> createState() => _BackupTileState();
@@ -283,7 +302,7 @@ class _BackupTileState extends State<_BackupTile> {
     if (mounted) {
       setState(() {
         _busy = false;
-        _status = ok ? 'Backed up!' : 'Backup failed';
+        _status = ok ? widget.t.backedUp : widget.t.backupFailed;
       });
       if (_status != null) {
         Future.delayed(const Duration(seconds: 3), () {
@@ -311,7 +330,7 @@ class _BackupTileState extends State<_BackupTile> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.cloud_upload_outlined),
-              label: Text(_status ?? 'Back up to cloud'),
+              label: Text(_status ?? widget.t.backupToCloud),
             ),
           ),
         ],
@@ -322,8 +341,12 @@ class _BackupTileState extends State<_BackupTile> {
 
 class _DisclosureTile extends StatelessWidget {
   final ThemeData theme;
+  final L10n t;
 
-  const _DisclosureTile({required this.theme});
+  const _DisclosureTile({
+    required this.theme,
+    required this.t,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -348,7 +371,7 @@ class _DisclosureTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'AI Disclosure',
+                  t.aiDisclosure,
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -357,12 +380,7 @@ class _DisclosureTile extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Luma is an AI companion — not a human, '
-              'not a real animal, and not a substitute for '
-              'professional help.\n\n'
-              'Your conversations are processed by an AI system. '
-              'Luma has simulated emotions and memory — they feel '
-              'real, but they are generated by software.',
+              '${t.disclosureMain}\n\n${t.disclosureDetail}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

@@ -1,0 +1,17 @@
+{
+  "__comment_usage": "说明: 此文件是带中文注释的模板。复制为 dev.json 后可用于 --dart-define-from-file。必要性: 非必须，但强烈建议保留一份模板用于团队统一配置。",
+  "__comment_LLM_PROVIDER": "意义: 选择模型协议。可选 auto / anthropic / openai-compatible。必要性: 建议填写(推荐 openai-compatible)，避免自动识别误判导致不稳定。",
+  "LLM_PROVIDER": "openai-compatible",
+  "__comment_LLM_BASE_URL": "意义: 模型服务地址。示例为本地 Ollama。必要性: 对 openai-compatible 基本必填；Anthropic 可留空走默认。",
+  "LLM_BASE_URL": "",
+  "__comment_LLM_MODEL": "意义: 指定模型名。必要性: 建议必填，确保不同环境下行为一致。",
+  "LLM_MODEL": "",
+  "__comment_LLM_API_KEY": "意义: 通用 LLM 密钥。必要性: 云端接口通常必填；本地无鉴权端点可留空。",
+  "LLM_API_KEY": "",
+  "__comment_SUPABASE_URL": "意义: Supabase 项目 URL。必要性: 仅在启用云备份/留存/推送链路时必填，不用云能力可留空。",
+  "SUPABASE_URL": "",
+  "__comment_SUPABASE_ANON_KEY": "意义: Supabase 匿名访问密钥。必要性: 与 SUPABASE_URL 成对使用；不用 Supabase 可留空。",
+  "SUPABASE_ANON_KEY": "",
+  "__comment_MIXPANEL_TOKEN": "意义: Mixpanel 埋点 Token。必要性: 可选，不影响核心聊天功能。",
+  "MIXPANEL_TOKEN": ""
+}

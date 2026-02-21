@@ -1,5 +1,6 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// Singleton database helper for Luma's local SQLite storage.
 ///
@@ -14,6 +15,7 @@ class LumaDatabase {
   static final instance = LumaDatabase._();
 
   Database? _db;
+  static bool _dbFactoryReady = false;
 
   Future<Database> get database async {
     _db ??= await _initDb();
@@ -21,6 +23,7 @@ class LumaDatabase {
   }
 
   Future<Database> _initDb() async {
+    _ensureDbFactory();
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, _dbName);
     return openDatabase(
@@ -28,6 +31,20 @@ class LumaDatabase {
       version: _dbVersion,
       onCreate: _onCreate,
     );
+  }
+
+  void _ensureDbFactory() {
+    if (_dbFactoryReady || kIsWeb) return;
+
+    final isDesktop = defaultTargetPlatform == TargetPlatform.linux ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows;
+
+    if (isDesktop) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
+    _dbFactoryReady = true;
   }
 
   Future<void> _onCreate(Database db, int version) async {

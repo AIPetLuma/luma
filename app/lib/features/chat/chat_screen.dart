@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../data/models/chat_message.dart';
 import '../../data/models/pet_state.dart';
+import 'chat_controller.dart';
+import '../../shared/l10n.dart';
 import 'crisis_card.dart';
 import 'disclosure_reminder.dart';
 
@@ -30,6 +32,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
+  static const _warningInvalidApiKey = 'invalid_api_key';
   bool _isSending = false;
   _InlineCrisis? _activeCrisis;
 
@@ -43,6 +46,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = L10n.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -66,7 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                widget.petState.emotion.label,
+                t.emotionText(widget.petState.emotion.label),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onPrimaryContainer,
                 ),
@@ -140,6 +144,10 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final result = await widget.onSendMessage(text);
 
+      if (result.warningCode != null) {
+        _showWarning(result.warningCode!);
+      }
+
       if (result.isCrisis && result.crisisMessage != null) {
         setState(() {
           _activeCrisis = _InlineCrisis(
@@ -151,12 +159,39 @@ class _ChatScreenState extends State<ChatScreen> {
       } else {
         _activeCrisis = null;
       }
+    } catch (e) {
+      debugPrint('Chat send failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(L10n.of(context).sendMessageFailed)),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
         _scrollToBottom();
       }
     }
+  }
+
+  void _showWarning(String warningCode) {
+    final t = L10n.of(context);
+    String message;
+    if (warningCode == _warningInvalidApiKey) {
+      message = t.invalidApiKeyWarning;
+    } else if (warningCode.startsWith(kChatWarningHttpErrorPrefix)) {
+      final suffix = warningCode.substring(kChatWarningHttpErrorPrefix.length);
+      final status = int.tryParse(suffix);
+      message = status == null
+          ? t.httpRequestFailedUnknown
+          : t.httpRequestFailedWithStatus(status);
+    } else {
+      message = t.sendMessageFailed;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   void _scrollToBottom() {
@@ -250,14 +285,14 @@ class _EmptyChat extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Say hello to $petName',
+              L10n.of(context).sayHelloTo(petName),
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Your conversation begins here.',
+              L10n.of(context).conversationBeginsHere,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -310,7 +345,7 @@ class _InputBar extends StatelessWidget {
               minLines: 1,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                hintText: 'Type a message...',
+                hintText: L10n.of(context).typeAMessage,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
@@ -369,6 +404,7 @@ class ChatResult {
   final int riskLevel;
   final String? crisisMessage;
   final String? emotion;
+  final String? warningCode;
 
   const ChatResult({
     required this.reply,
@@ -376,5 +412,6 @@ class ChatResult {
     required this.riskLevel,
     this.crisisMessage,
     this.emotion,
+    this.warningCode,
   });
 }

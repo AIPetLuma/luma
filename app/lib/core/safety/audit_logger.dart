@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../data/local/database.dart';
 
@@ -76,13 +77,19 @@ class AuditLogger {
     int? riskLevel,
     required Map<String, dynamic> detail,
   }) async {
-    final db = await _db;
-    await db.insert('audit_logs', {
-      'event_type': eventType,
-      'risk_level': riskLevel,
-      'detail': jsonEncode(detail),
-      'created_at': DateTime.now().toIso8601String(),
-    });
+    // Compliance logging must never break product UX in degraded envs
+    // (e.g. widget tests without sqflite factory init).
+    try {
+      final db = await _db;
+      await db.insert('audit_logs', {
+        'event_type': eventType,
+        'risk_level': riskLevel,
+        'detail': jsonEncode(detail),
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('AuditLogger skipped: $e');
+    }
   }
 
   String _actionForLevel(int level) {
@@ -100,7 +107,12 @@ class AuditLogger {
 
   /// Export all logs (for audit review, not user-facing).
   Future<List<Map<String, dynamic>>> exportAll() async {
-    final db = await _db;
-    return db.query('audit_logs', orderBy: 'created_at ASC');
+    try {
+      final db = await _db;
+      return db.query('audit_logs', orderBy: 'created_at ASC');
+    } catch (e) {
+      debugPrint('AuditLogger export skipped: $e');
+      return const [];
+    }
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// Manages local notification setup and display.
@@ -13,24 +14,32 @@ class NotificationService {
   static Future<void> init() async {
     if (_initialised) return;
 
-    await _plugin.initialize(
-      const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(
-          requestAlertPermission: true,
-          requestBadgePermission: true,
-          requestSoundPermission: true,
+    try {
+      await _plugin.initialize(
+        const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          ),
+          linux: LinuxInitializationSettings(
+            defaultActionName: 'Open notification',
+          ),
         ),
-      ),
-    );
+      );
 
-    // Request permission on iOS / Android 13+.
-    await _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
+      // Request permission on iOS / Android 13+.
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
 
-    _initialised = true;
+      _initialised = true;
+    } catch (e) {
+      // Local notifications are optional; app should still run.
+      debugPrint('NotificationService init skipped: $e');
+    }
   }
 
   /// Show a pet-initiated notification.
@@ -39,21 +48,27 @@ class NotificationService {
     required String body,
   }) async {
     await init(); // ensure initialised
+    if (!_initialised) return;
 
-    await _plugin.show(
-      0,
-      title,
-      body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'luma_pet',
-          'Pet Messages',
-          channelDescription: 'Your Luma pet reaching out to you',
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
+    try {
+      await _plugin.show(
+        0,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'luma_pet',
+            'Pet Messages',
+            channelDescription: 'Your Luma pet reaching out to you',
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+          ),
+          iOS: DarwinNotificationDetails(),
+          linux: LinuxNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-    );
+      );
+    } catch (e) {
+      debugPrint('NotificationService show skipped: $e');
+    }
   }
 }

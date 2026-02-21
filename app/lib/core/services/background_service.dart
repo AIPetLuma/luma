@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/services.dart';
 import 'package:workmanager/workmanager.dart';
 import '../../data/local/pet_dao.dart';
 import '../engine/need_system.dart';
@@ -78,16 +80,32 @@ Future<void> _showNotification(String petName, String mood) async {
 
 /// Register the background task. Call once from main().
 class BackgroundService {
+  static bool get _supportsWorkmanager =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
   static Future<void> init() async {
-    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
-    await Workmanager().registerPeriodicTask(
-      'luma-bg-tick',
-      kBackgroundTaskName,
-      frequency: const Duration(minutes: 15), // minimum on Android
-      constraints: Constraints(
-        networkType: NetworkType.not_required,
-        requiresBatteryNotLow: true,
-      ),
-    );
+    if (!_supportsWorkmanager) {
+      debugPrint('BackgroundService: WorkManager unsupported on this platform.');
+      return;
+    }
+
+    try {
+      await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+      await Workmanager().registerPeriodicTask(
+        'luma-bg-tick',
+        kBackgroundTaskName,
+        frequency: const Duration(minutes: 15), // minimum on Android
+        constraints: Constraints(
+          networkType: NetworkType.not_required,
+          requiresBatteryNotLow: true,
+        ),
+      );
+    } on MissingPluginException catch (e) {
+      debugPrint('BackgroundService init skipped: $e');
+    } catch (e) {
+      debugPrint('BackgroundService init failed: $e');
+    }
   }
 }

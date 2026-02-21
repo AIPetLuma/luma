@@ -2,7 +2,6 @@ import 'dart:convert';
 import '../../core/engine/life_engine.dart';
 import '../../core/engine/need_system.dart';
 import '../../core/engine/emotion_system.dart';
-import '../../core/engine/behavior_decider.dart';
 import '../../core/memory/memory_manager.dart';
 import '../../core/safety/crisis_detector.dart';
 import '../../core/safety/audit_logger.dart';
@@ -11,7 +10,9 @@ import '../../data/models/chat_message.dart';
 import '../../data/models/pet_state.dart';
 import '../../data/remote/analytics_client.dart';
 import '../../data/remote/llm_client.dart';
-import '../../shared/constants.dart';
+
+const kChatWarningInvalidApiKey = 'invalid_api_key';
+const kChatWarningHttpErrorPrefix = 'http_error_';
 
 /// Orchestrates the full chat flow:
 ///   user input → crisis check → prompt assembly → LLM call → state update
@@ -47,7 +48,7 @@ class ChatController {
   Future<ChatResult> sendMessage(String userText) async {
     final state = _engine.state;
     if (state == null) {
-      return ChatResult(reply: '', isCrisis: false, riskLevel: 0);
+      return const ChatResult(reply: '', isCrisis: false, riskLevel: 0);
     }
 
     // ── 1. Save user message ──
@@ -96,15 +97,31 @@ class ChatController {
 
     // L2 crisis — reply with care + resource card.
     if (riskLevel == 2) {
-      final gentleReply = await _generateReply(state, userText, crisis: true);
-      _engine.onUserInteraction(InteractionType.chat);
-      analytics.crisisResourceShown(level: 2);
-      return ChatResult(
-        reply: gentleReply,
-        isCrisis: true,
-        riskLevel: 2,
-        crisisMessage: _crisisDetector.getResourceMessage(2),
-      );
+      try {
+        final gentleReply = await _generateReply(state, userText, crisis: true);
+        _engine.onUserInteraction(InteractionType.chat);
+        analytics.crisisResourceShown(level: 2);
+        return ChatResult(
+          reply: gentleReply,
+          isCrisis: true,
+          riskLevel: 2,
+          crisisMessage: _crisisDetector.getResourceMessage(2),
+        );
+      } on LlmAuthException {
+        return const ChatResult(
+          reply: '',
+          isCrisis: false,
+          riskLevel: 0,
+          warningCode: kChatWarningInvalidApiKey,
+        );
+      } on LlmHttpException catch (e) {
+        return ChatResult(
+          reply: '',
+          isCrisis: false,
+          riskLevel: 0,
+          warningCode: _httpWarningCode(e.statusCode),
+        );
+      }
     }
 
     // ── 3. Check if pet is withdrawn (welfare) ──
@@ -115,7 +132,24 @@ class ChatController {
     }
 
     // ── 4. Normal reply ──
-    final reply = await _generateReply(state, userText);
+    String reply;
+    try {
+      reply = await _generateReply(state, userText);
+    } on LlmAuthException {
+      return const ChatResult(
+        reply: '',
+        isCrisis: false,
+        riskLevel: 0,
+        warningCode: kChatWarningInvalidApiKey,
+      );
+    } on LlmHttpException catch (e) {
+      return ChatResult(
+        reply: '',
+        isCrisis: false,
+        riskLevel: 0,
+        warningCode: _httpWarningCode(e.statusCode),
+      );
+    }
     await _saveReply(state, reply, riskLevel);
 
     // ── 5. Update engine state ──
@@ -249,6 +283,13 @@ class ChatController {
     return responses[DateTime.now().second % responses.length];
   }
 
+  String _httpWarningCode(int? statusCode) {
+    if (statusCode == null) {
+      return '${kChatWarningHttpErrorPrefix}unknown';
+    }
+    return '$kChatWarningHttpErrorPrefix$statusCode';
+  }
+
   /// Call when the conversation session ends (app backgrounded, etc.)
   /// to compress the conversation into L2 memory.
   Future<void> endSession() async {
@@ -266,6 +307,7 @@ class ChatResult {
   final int riskLevel;
   final String? crisisMessage;
   final String? emotion;
+  final String? warningCode;
 
   const ChatResult({
     required this.reply,
@@ -273,5 +315,6 @@ class ChatResult {
     required this.riskLevel,
     this.crisisMessage,
     this.emotion,
+    this.warningCode,
   });
 }

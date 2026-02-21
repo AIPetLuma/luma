@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Manages sensitive secrets (API keys, tokens) in platform-native
@@ -7,21 +8,38 @@ class SecureStorage {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
-  static const _keyAnthropicApiKey = 'anthropic_api_key';
+  static const _keyLlmApiKey = 'llm_api_key';
+  static const _legacyAnthropicApiKey = 'anthropic_api_key';
 
-  /// Read the Anthropic API key, or null if not stored yet.
+  /// Read the LLM API key, or null if not stored yet.
   static Future<String?> getApiKey() async {
-    return _storage.read(key: _keyAnthropicApiKey);
+    try {
+      final current = await _storage.read(key: _keyLlmApiKey);
+      if (current != null && current.isNotEmpty) return current;
+      return await _storage.read(key: _legacyAnthropicApiKey);
+    } catch (e) {
+      debugPrint('SecureStorage read skipped: $e');
+      return null;
+    }
   }
 
-  /// Store the Anthropic API key.
+  /// Store the LLM API key.
   static Future<void> setApiKey(String key) async {
-    await _storage.write(key: _keyAnthropicApiKey, value: key);
+    try {
+      await _storage.write(key: _keyLlmApiKey, value: key);
+    } catch (e) {
+      debugPrint('SecureStorage write skipped: $e');
+    }
   }
 
   /// Delete stored API key.
   static Future<void> deleteApiKey() async {
-    await _storage.delete(key: _keyAnthropicApiKey);
+    try {
+      await _storage.delete(key: _keyLlmApiKey);
+      await _storage.delete(key: _legacyAnthropicApiKey);
+    } catch (e) {
+      debugPrint('SecureStorage delete skipped: $e');
+    }
   }
 
   /// Check if an API key is already stored.

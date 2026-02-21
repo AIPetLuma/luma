@@ -5,6 +5,13 @@ import 'package:luma/data/models/pet_state.dart';
 import 'package:luma/data/models/need.dart';
 import 'package:luma/data/models/emotion.dart';
 
+// Test Scope (EN):
+// - Validate settings surface for identity, disclosure, and crisis resources.
+// - Keep checks on user-visible compliance sections.
+//
+// 测试范围（中文）：
+// - 校验设置页中的身份信息、披露信息与危机资源入口。
+// - 聚焦用户可见合规模块，防止回归。
 void main() {
   PetState _makePet() => PetState(
         id: 'test',
@@ -20,6 +27,8 @@ void main() {
       );
 
   group('SettingsScreen', () {
+    // EN: pet identity and high-level stats should be visible.
+    // 中文：宠物身份与核心统计信息应可见。
     testWidgets('shows pet name and stats', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -37,6 +46,8 @@ void main() {
       expect(find.textContaining('Day'), findsOneWidget);
     });
 
+    // EN: AI disclosure section must remain discoverable.
+    // 中文：AI 披露模块必须始终可被用户访问。
     testWidgets('shows AI disclosure section', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -53,6 +64,8 @@ void main() {
       expect(find.textContaining('AI companion'), findsOneWidget);
     });
 
+    // EN: crisis resources should be present, even if scrolled.
+    // 中文：危机资源必须存在，必要时通过滚动定位。
     testWidgets('shows crisis resources', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -65,6 +78,11 @@ void main() {
         ),
       );
 
+      await tester.scrollUntilVisible(
+        find.text('Crisis resources'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.textContaining('988'), findsWidgets);
     });
   });

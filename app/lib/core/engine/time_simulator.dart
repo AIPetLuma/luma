@@ -1,6 +1,8 @@
 import 'dart:math';
 import '../../data/models/pet_state.dart';
 import '../../data/models/diary_entry.dart';
+import '../../data/models/need.dart';
+import '../../data/models/emotion.dart';
 import '../../shared/constants.dart';
 import 'need_system.dart';
 import 'emotion_system.dart';

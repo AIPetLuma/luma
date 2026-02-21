@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/pet_state.dart';
+import 'supabase_client_service.dart';
 
 /// Optional cloud backup via Supabase.
 ///
@@ -18,22 +19,22 @@ class BackupService {
 
   bool get isAvailable => _client != null;
 
-  /// Initialise Supabase. No-op if credentials are missing.
-  Future<void> init({
-    required String url,
-    required String anonKey,
-  }) async {
-    if (url.isEmpty || anonKey.isEmpty) {
-      debugPrint('BackupService: no Supabase credentials — disabled.');
+  /// Bind to the already-initialized shared Supabase client.
+  Future<void> init() async {
+    final supabase = SupabaseClientService.instance;
+    if (!supabase.isAvailable) {
+      debugPrint('BackupService: Supabase unavailable — disabled.');
       return;
     }
-    try {
-      await Supabase.initialize(url: url, anonKey: anonKey);
-      _client = Supabase.instance.client;
-      debugPrint('BackupService: Supabase connected.');
-    } catch (e) {
-      debugPrint('BackupService: init failed ($e) — disabled.');
+
+    final hasSession = await supabase.ensureAnonymousSession();
+    if (!hasSession) {
+      debugPrint('BackupService: no auth session — disabled.');
+      return;
     }
+
+    _client = supabase.client;
+    debugPrint('BackupService: Supabase connected.');
   }
 
   /// Upload the current pet state to Supabase.
@@ -41,10 +42,17 @@ class BackupService {
   /// Uses upsert so the same pet ID overwrites the previous backup.
   Future<bool> backup(PetState pet) async {
     if (_client == null) return false;
+    final ownerId = SupabaseClientService.instance.userId;
+    if (ownerId == null) return false;
+
     try {
       final data = pet.toMap();
+      data['owner_id'] = ownerId;
       data['backed_up_at'] = DateTime.now().toIso8601String();
-      await _client!.from('pet_backups').upsert(data);
+      await _client!.from('pet_backups').upsert(
+            data,
+            onConflict: 'owner_id,id',
+          );
       debugPrint('BackupService: pet "${pet.name}" backed up.');
       return true;
     } catch (e) {
@@ -58,10 +66,14 @@ class BackupService {
   /// Returns null if no backup exists or the service is unavailable.
   Future<PetState?> restore(String petId) async {
     if (_client == null) return null;
+    final ownerId = SupabaseClientService.instance.userId;
+    if (ownerId == null) return null;
+
     try {
       final response = await _client!
           .from('pet_backups')
           .select()
+          .eq('owner_id', ownerId)
           .eq('id', petId)
           .maybeSingle();
       if (response == null) return null;
@@ -75,10 +87,14 @@ class BackupService {
   /// List all backed-up pets (for device transfer).
   Future<List<Map<String, dynamic>>> listBackups() async {
     if (_client == null) return [];
+    final ownerId = SupabaseClientService.instance.userId;
+    if (ownerId == null) return [];
+
     try {
       final response = await _client!
           .from('pet_backups')
           .select('id, name, backed_up_at')
+          .eq('owner_id', ownerId)
           .order('backed_up_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {

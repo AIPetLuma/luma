@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/engine/life_engine.dart';
-import '../core/engine/behavior_decider.dart';
 import '../core/identity/pet_identity.dart';
 import '../core/memory/memory_manager.dart';
 import '../core/safety/audit_logger.dart';
@@ -28,13 +27,35 @@ final crisisDetectorProvider = Provider((_) => CrisisDetector());
 final apiKeyProvider = FutureProvider<String>((ref) async {
   final stored = await SecureStorage.getApiKey();
   if (stored != null && stored.isNotEmpty) return stored;
-  return const String.fromEnvironment('ANTHROPIC_API_KEY');
+
+  const generic = String.fromEnvironment('LLM_API_KEY');
+  if (generic.isNotEmpty) return generic;
+
+  const anthropic = String.fromEnvironment('ANTHROPIC_API_KEY');
+  if (anthropic.isNotEmpty) return anthropic;
+
+  return const String.fromEnvironment('OPENAI_API_KEY');
 });
 
 final llmClientProvider = Provider((ref) {
   final apiKeyAsync = ref.watch(apiKeyProvider);
   final apiKey = apiKeyAsync.valueOrNull ?? '';
-  return LlmClient(apiKey: apiKey);
+  const rawProvider = String.fromEnvironment('LLM_PROVIDER', defaultValue: 'auto');
+  const baseUrl = String.fromEnvironment('LLM_BASE_URL');
+  const model = String.fromEnvironment('LLM_MODEL');
+
+  final provider = LlmClient.resolveProvider(
+    raw: rawProvider,
+    apiKey: apiKey,
+    baseUrl: baseUrl,
+  );
+
+  return LlmClient(
+    apiKey: apiKey,
+    provider: provider,
+    baseUrl: baseUrl.isEmpty ? null : baseUrl,
+    defaultModel: model.isEmpty ? null : model,
+  );
 });
 
 // ── Life Engine ──
