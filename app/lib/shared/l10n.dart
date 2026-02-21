@@ -50,6 +50,18 @@ class L10n {
   String get surpriseMe => _isZh ? '随机' : 'Surprise me';
   String get surpriseDescription =>
       _isZh ? '完全随机的性格 — 谁知道呢！' : 'A completely random personality — who knows!';
+  String get explorerPreset => _isZh ? '探索者' : 'Explorer';
+  String get explorerPresetDescription =>
+      _isZh ? '好奇、爱冒险、总爱提问' : 'Curious, adventurous, always asking questions';
+  String get gentleSoulPreset => _isZh ? '温柔灵魂' : 'Gentle Soul';
+  String get gentleSoulPresetDescription =>
+      _isZh ? '平静、体贴、能感知你的情绪' : 'Calm, caring, sensitive to your mood';
+  String get playfulSpiritPreset => _isZh ? '顽皮精灵' : 'Playful Spirit';
+  String get playfulSpiritPresetDescription =>
+      _isZh ? '精力充沛、爱恶作剧、喜欢惊喜' : 'Energetic, mischievous, loves surprises';
+  String get shyDreamerPreset => _isZh ? '害羞梦想家' : 'Shy Dreamer';
+  String get shyDreamerPresetDescription =>
+      _isZh ? '安静、富有想象力、慢热' : 'Quiet, imaginative, warms up slowly';
   String get continueButton => _isZh ? '继续' : 'Continue';
 
   // ── Onboarding: Name ──
@@ -91,6 +103,21 @@ class L10n {
 
   // ── Chat ──
   String get sayHello => _isZh ? '跟你的 Luma 打个招呼吧' : 'Say hello to your Luma';
+  String sayHelloTo(String petName) =>
+      _isZh ? '和 $petName 打个招呼吧' : 'Say hello to $petName';
+  String get conversationBeginsHere => _isZh ? '你们的对话从这里开始。' : 'Your conversation begins here.';
+  String get typeAMessage => _isZh ? '输入消息…' : 'Type a message...';
+  String get sendMessageFailed =>
+      _isZh ? '消息发送失败，请稍后重试。' : 'Message failed to send. Please try again.';
+  String get invalidApiKeyWarning => _isZh
+      ? 'LLM API 密钥无效或未配置，请到设置页更新后重试。'
+      : 'LLM API key is invalid or missing. Please update it in Settings.';
+  String httpRequestFailedWithStatus(int statusCode) => _isZh
+      ? 'LLM 请求失败（HTTP $statusCode）。请检查 API key、模型名和服务地址。'
+      : 'LLM request failed (HTTP $statusCode). Check API key, model, and endpoint.';
+  String get httpRequestFailedUnknown => _isZh
+      ? 'LLM 请求失败（未知状态码）。请检查网络或服务配置。'
+      : 'LLM request failed (unknown status). Check network or endpoint settings.';
   String get disclosureReminder => _isZh
       ? '提醒：Luma 是 AI 伙伴，不是人类或真实动物。'
       : 'Reminder: Luma is an AI companion, not a human or real animal.';
@@ -103,7 +130,22 @@ class L10n {
   String get aboutLuma => _isZh ? '关于 Luma' : 'About Luma';
   String get aiDisclosure => _isZh ? 'AI 披露' : 'AI Disclosure';
   String get crisisResources => _isZh ? '危机资源' : 'Crisis resources';
+  String get crisisLifeline =>
+      _isZh ? '988 自杀与危机生命线' : '988 Suicide & Crisis Lifeline';
+  String get crisisTextLine => _isZh ? '危机短信热线' : 'Crisis Text Line';
+  String callOrText(String number) =>
+      _isZh ? '拨打或短信 $number' : 'Call or text $number';
   String get apiKey => _isZh ? 'API 密钥' : 'API key';
+  String get anthropicApiKey => _isZh ? 'LLM API 密钥' : 'LLM API key';
+  String get apiKeyHint => _isZh
+      ? 'sk-ant-... / sk-...（本地无鉴权可留空）'
+      : 'sk-ant-... / sk-... (optional for local no-auth endpoint)';
+  String get cloudBackup => _isZh ? '云端备份' : 'Cloud backup';
+  String get backupToCloud => _isZh ? '备份到云端' : 'Back up to cloud';
+  String get backedUp => _isZh ? '已完成备份！' : 'Backed up!';
+  String get backupFailed => _isZh ? '备份失败' : 'Backup failed';
+  String get optionalCloudBackup =>
+      _isZh ? '可选云端备份已可用' : 'Optional cloud backup available';
   String get dataPrivacy => _isZh ? '数据与隐私' : 'Data & privacy';
   String get dataLocal =>
       _isZh ? '所有数据保存在你的设备上' : 'All data stays on your device';
@@ -119,10 +161,13 @@ class L10n {
   String get reset => _isZh ? '重置' : 'Reset';
   String get saveApiKey => _isZh ? '保存 API 密钥' : 'Save API key';
   String get saved => _isZh ? '已保存' : 'Saved';
+  String dayTogether(int day) => _isZh ? '一起第 $day 天' : 'Day $day together';
 
   // ── Crisis card ──
   String get crisisSupport => _isZh ? '危机支持' : 'Crisis Support';
   String get youAreNotAlone => _isZh ? '你不是一个人' : 'You are not alone';
+  String callHotline(String hotline) => _isZh ? '拨打 $hotline' : 'Call $hotline';
+  String textHotline(String hotline) => _isZh ? '短信 $hotline' : 'Text $hotline';
 }
 
 /// Delegate for the [L10n] localizations.

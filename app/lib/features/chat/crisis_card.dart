@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../shared/constants.dart';
+import '../../shared/l10n.dart';
 import '../../core/safety/audit_logger.dart';
 
 /// An inline card showing crisis resources. Shown when the crisis
@@ -32,6 +33,7 @@ class _CrisisCardState extends State<CrisisCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = L10n.of(context);
     final isEmergency = widget.riskLevel >= 3;
 
     return Padding(
@@ -66,7 +68,7 @@ class _CrisisCardState extends State<CrisisCard> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  isEmergency ? 'Crisis Support' : 'You are not alone',
+                  isEmergency ? t.crisisSupport : t.youAreNotAlone,
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: isEmergency
@@ -92,13 +94,13 @@ class _CrisisCardState extends State<CrisisCard> {
               runSpacing: 8,
               children: [
                 _ResourceChip(
-                  label: 'Call ${LumaConstants.crisisHotlineUS}',
+                  label: t.callHotline(LumaConstants.crisisHotlineUS),
                   icon: Icons.call_outlined,
                   isEmergency: isEmergency,
                   onTap: () => _launchUrl('tel:${LumaConstants.crisisHotlineUS}'),
                 ),
                 _ResourceChip(
-                  label: 'Text ${LumaConstants.crisisHotlineUS}',
+                  label: t.textHotline(LumaConstants.crisisHotlineUS),
                   icon: Icons.textsms_outlined,
                   isEmergency: isEmergency,
                   onTap: () => _launchUrl('sms:${LumaConstants.crisisHotlineUS}'),

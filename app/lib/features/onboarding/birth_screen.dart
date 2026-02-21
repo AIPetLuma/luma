@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/identity/pet_identity.dart';
+import '../../shared/l10n.dart';
+import '../../shared/runtime_env.dart';
 
 /// Personality selection screen — the user chooses who their pet will be.
 class BirthScreen extends StatefulWidget {
@@ -18,10 +20,12 @@ class _BirthScreenState extends State<BirthScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = L10n.of(context);
+    final shouldAnimate = !isRunningWidgetTest;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Choose a personality'),
+        title: Text(t.choosePersonality),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -32,8 +36,7 @@ class _BirthScreenState extends State<BirthScreen> {
             children: [
               const SizedBox(height: 16),
               Text(
-                'Every Luma is unique. Pick a starting personality — '
-                'it will evolve as you spend time together.',
+                t.personalityHint,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -45,38 +48,51 @@ class _BirthScreenState extends State<BirthScreen> {
                 child: ListView(
                   children: [
                     for (var i = 0; i < PersonalityPreset.values.length; i++)
-                      _PresetCard(
-                        preset: PersonalityPreset.values[i],
-                        isSelected: _selected == PersonalityPreset.values[i],
-                        onTap: () => setState(
-                            () => _selected = PersonalityPreset.values[i]),
-                      )
-                          .animate()
-                          .fadeIn(
-                              delay: (100 * i).ms, duration: 400.ms)
-                          .slideX(
-                              begin: 0.1,
-                              end: 0,
-                              delay: (100 * i).ms,
-                              duration: 400.ms),
+                      (() {
+                        Widget card = _PresetCard(
+                          preset: PersonalityPreset.values[i],
+                          isSelected: _selected == PersonalityPreset.values[i],
+                          onTap: () => setState(
+                              () => _selected = PersonalityPreset.values[i]),
+                        );
+                        if (shouldAnimate) {
+                          card = card
+                              .animate()
+                              .fadeIn(delay: (100 * i).ms, duration: 400.ms)
+                              .slideX(
+                                  begin: 0.1,
+                                  end: 0,
+                                  delay: (100 * i).ms,
+                                  duration: 400.ms);
+                        }
+                        return card;
+                      })(),
                     // Random option
-                    _PresetCard(
-                      preset: null,
-                      isSelected: _selected == null && _hasExplicitlyChosen,
-                      onTap: () => setState(() {
-                        _selected = null;
-                        _hasExplicitlyChosen = true;
-                      }),
-                    )
-                        .animate()
-                        .fadeIn(
-                            delay: (100 * PersonalityPreset.values.length).ms,
-                            duration: 400.ms)
-                        .slideX(
-                            begin: 0.1,
-                            end: 0,
-                            delay: (100 * PersonalityPreset.values.length).ms,
-                            duration: 400.ms),
+                    (() {
+                      Widget card = _PresetCard(
+                        preset: null,
+                        isSelected: _selected == null && _hasExplicitlyChosen,
+                        onTap: () => setState(() {
+                          _selected = null;
+                          _hasExplicitlyChosen = true;
+                        }),
+                      );
+                      if (shouldAnimate) {
+                        card = card
+                            .animate()
+                            .fadeIn(
+                                delay: (100 * PersonalityPreset.values.length)
+                                    .ms,
+                                duration: 400.ms)
+                            .slideX(
+                                begin: 0.1,
+                                end: 0,
+                                delay: (100 * PersonalityPreset.values.length)
+                                    .ms,
+                                duration: 400.ms);
+                      }
+                      return card;
+                    })(),
                   ],
                 ),
               ),
@@ -89,7 +105,7 @@ class _BirthScreenState extends State<BirthScreen> {
                   onPressed: (_selected != null || _hasExplicitlyChosen)
                       ? () => widget.onSelected(_selected)
                       : null,
-                  child: const Text('Continue'),
+                  child: Text(t.continueButton),
                 ),
               ),
               const SizedBox(height: 24),
@@ -117,9 +133,23 @@ class _PresetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = preset?.label ?? 'Surprise me';
-    final description =
-        preset?.description ?? 'A completely random personality — who knows!';
+    final t = L10n.of(context);
+
+    final label = switch (preset) {
+      PersonalityPreset.curious => t.explorerPreset,
+      PersonalityPreset.gentle => t.gentleSoulPreset,
+      PersonalityPreset.playful => t.playfulSpiritPreset,
+      PersonalityPreset.shy => t.shyDreamerPreset,
+      null => t.surpriseMe,
+    };
+
+    final description = switch (preset) {
+      PersonalityPreset.curious => t.explorerPresetDescription,
+      PersonalityPreset.gentle => t.gentleSoulPresetDescription,
+      PersonalityPreset.playful => t.playfulSpiritPresetDescription,
+      PersonalityPreset.shy => t.shyDreamerPresetDescription,
+      null => t.surpriseDescription,
+    };
     final icon = switch (preset) {
       PersonalityPreset.curious => Icons.explore_outlined,
       PersonalityPreset.gentle => Icons.favorite_outline,

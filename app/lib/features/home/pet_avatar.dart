@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../data/models/emotion.dart';
+import '../../shared/runtime_env.dart';
 
 /// Animated avatar that reflects the pet's emotional state.
 ///
@@ -30,7 +31,10 @@ class _PetAvatarState extends State<PetAvatar>
     _breathController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
-    )..repeat();
+    );
+    if (!isRunningWidgetTest) {
+      _breathController.repeat();
+    }
   }
 
   @override

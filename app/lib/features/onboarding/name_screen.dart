@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../shared/l10n.dart';
+import '../../shared/runtime_env.dart';
 
 /// Final onboarding step — the user names their pet.
 class NameScreen extends StatefulWidget {
@@ -36,10 +38,47 @@ class _NameScreenState extends State<NameScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = L10n.of(context);
+    final shouldAnimate = !isRunningWidgetTest;
+
+    Widget eggBlock = Container(
+      width: 120,
+      height: 120,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Icons.egg_outlined,
+        size: 56,
+        color: theme.colorScheme.primary,
+      ),
+    );
+    if (shouldAnimate) {
+      eggBlock = eggBlock
+          .animate()
+          .scaleXY(begin: 1.0, end: 1.05, duration: 700.ms)
+          .then()
+          .scaleXY(begin: 1.05, end: 1.0, duration: 700.ms)
+          .then()
+          .shimmer(
+              duration: 1200.ms,
+              color: theme.colorScheme.primary.withValues(alpha: 0.3));
+    }
+
+    Widget promptBlock = Text(
+      t.whatWillYouCall,
+      style: theme.textTheme.titleLarge,
+      textAlign: TextAlign.center,
+    );
+    if (shouldAnimate) {
+      promptBlock =
+          promptBlock.animate().fadeIn(delay: 300.ms, duration: 500.ms);
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Name your Luma'),
+        title: Text(t.nameYourLuma),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -50,35 +89,13 @@ class _NameScreenState extends State<NameScreen> {
               const Spacer(flex: 2),
 
               // Egg / hatching illustration placeholder
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.egg_outlined,
-                  size: 56,
-                  color: theme.colorScheme.primary,
-                ),
-              )
-                  .animate(onPlay: (c) => c.repeat(reverse: true))
-                  .scaleXY(begin: 1.0, end: 1.05, duration: 1500.ms)
-                  .then()
-                  .shimmer(duration: 1200.ms, color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+              eggBlock,
               const SizedBox(height: 32),
 
-              Text(
-                'What will you call your companion?',
-                style: theme.textTheme.titleLarge,
-                textAlign: TextAlign.center,
-              )
-                  .animate()
-                  .fadeIn(delay: 300.ms, duration: 500.ms),
+              promptBlock,
               const SizedBox(height: 8),
               Text(
-                'Choose carefully — this name is part of who they are.',
+                t.chooseCarefully,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -96,7 +113,7 @@ class _NameScreenState extends State<NameScreen> {
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineSmall,
                 decoration: InputDecoration(
-                  hintText: 'Type a name...',
+                  hintText: t.typeAName,
                   counterText: '',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -116,7 +133,7 @@ class _NameScreenState extends State<NameScreen> {
                 height: 56,
                 child: FilledButton(
                   onPressed: _isValid ? _submit : null,
-                  child: const Text('Bring to life'),
+                  child: Text(t.bringToLife),
                 ),
               ),
               const SizedBox(height: 24),

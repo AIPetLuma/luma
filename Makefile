@@ -13,11 +13,16 @@ MAIN_BRANCH = main
 SECRETS_FILE ?= $(HOME)/.config/dr-agent/secrets.env
 SECRETS_DIR := $(dir $(SECRETS_FILE))
 RUN_WITH_SECRETS = DR_SECRETS_FILE="$(SECRETS_FILE)" bash scripts/run_with_secrets.sh
+APP_PATH ?= app
+DEFINE_FILE ?= dev.json
+RUN_DEVICE ?= linux
+BUILD_TARGET ?= linux
 
 
 .PHONY: help \
 	up newup ship sup fullpr-sub fullpr-main sync sync-sub-main new branch-check \
-	secrets-init secrets-check api-run demo-run smoke-api-secrets deploy-fuji
+	secrets-init secrets-check api-run demo-run smoke-api-secrets deploy-fuji \
+	flutter-run flutter-build fr fb
 
 # 默认命令：输入 make 就会显示帮助
 help:
@@ -38,6 +43,13 @@ help:
 	@echo "make demo-run                   # 使用外置 secrets 执行闭环演示"
 	@echo "make smoke-api-secrets          # 使用外置 secrets 执行 API 冒烟"
 	@echo "make deploy-fuji                # 使用外置 secrets 部署 Fuji"
+	@echo ""
+	@echo "--- Flutter 配置缩写命令 ---"
+	@echo "make fr                         # 读取 dev.json 并运行 (默认 linux)"
+	@echo "make fb                         # 读取 dev.json 并构建 (默认 linux)"
+	@echo "make fr RUN_DEVICE=windows      # 指定运行设备"
+	@echo "make fb BUILD_TARGET=apk        # 指定构建目标"
+	@echo "make fr DEFINE_FILE=dev.local.json # 指定配置文件"
 
 # 外置 secrets：在工作区外创建 secrets 文件（默认 ~/.config/dr-agent/secrets.env）
 secrets-init:
@@ -71,6 +83,18 @@ smoke-api-secrets:
 # 使用外置 secrets 部署 Fuji
 deploy-fuji:
 	@$(RUN_WITH_SECRETS) npx hardhat run scripts/deploy_fuji.ts --network fuji
+
+# Flutter 运行（读取 JSON 配置）
+flutter-run:
+	@cd $(APP_PATH) && flutter run -d $(RUN_DEVICE) --dart-define-from-file=../$(DEFINE_FILE)
+
+# Flutter 构建（读取 JSON 配置）
+flutter-build:
+	@cd $(APP_PATH) && flutter build $(BUILD_TARGET) --dart-define-from-file=../$(DEFINE_FILE)
+
+# 缩写命令
+fr: flutter-run
+fb: flutter-build
 
 # 1. 基础提交
 up:

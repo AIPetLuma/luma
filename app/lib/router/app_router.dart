@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/pet_state.dart';
@@ -9,11 +11,13 @@ import '../features/chat/chat_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../providers/pet_provider.dart';
 import '../core/identity/pet_identity.dart';
+import '../core/engine/life_engine.dart';
 import '../data/local/secure_storage.dart';
 import '../data/remote/analytics_client.dart';
+import '../data/remote/retention_service.dart';
 import '../shared/constants.dart';
 import '../shared/l10n.dart';
-import '../features/chat/chat_controller.dart' as ctrl;
+import '../core/services/fcm_service.dart';
 
 /// Top-level router that decides which screen to show based on app state.
 ///
@@ -30,23 +34,26 @@ class _AppRouterState extends ConsumerState<AppRouter>
   _Screen _screen = _Screen.loading;
   PersonalityPreset? _selectedPreset;
   DateTime? _sessionStart;
+  String? _boundFcmPetId;
+  late final LifeEngine _lifeEngine;
 
   @override
   void initState() {
     super.initState();
+    _lifeEngine = ref.read(lifeEngineProvider);
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    ref.read(lifeEngineProvider).dispose();
+    _lifeEngine.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final engine = ref.read(lifeEngineProvider);
+    final engine = _lifeEngine;
     final analytics = AnalyticsClient.instance;
     final petId = engine.state?.id;
 
@@ -57,6 +64,12 @@ class _AppRouterState extends ConsumerState<AppRouter>
       if (petId != null && _sessionStart != null) {
         final duration = DateTime.now().difference(_sessionStart!).inSeconds;
         analytics.sessionEnded(petId: petId, durationSeconds: duration);
+        unawaited(
+          RetentionService.instance.recordSessionEnded(
+            petId: petId,
+            durationSeconds: duration,
+          ),
+        );
         _sessionStart = null;
       }
     } else if (state == AppLifecycleState.resumed) {
@@ -66,6 +79,7 @@ class _AppRouterState extends ConsumerState<AppRouter>
       if (petId != null) {
         _sessionStart = DateTime.now();
         analytics.sessionStarted(petId: petId);
+        unawaited(RetentionService.instance.recordSessionStarted(petId: petId));
       }
     }
   }
@@ -93,7 +107,14 @@ class _AppRouterState extends ConsumerState<AppRouter>
             AnalyticsClient.instance.identify(petState.id);
             AnalyticsClient.instance
                 .sessionStarted(petId: petState.id);
+            unawaited(
+              RetentionService.instance.recordSessionStarted(petId: petState.id),
+            );
           }
+        }
+
+        if (petState != null) {
+          _ensureFcmBound(petState.id);
         }
 
         return AnimatedSwitcher(
@@ -135,12 +156,16 @@ class _AppRouterState extends ConsumerState<AppRouter>
                   preset: _selectedPreset,
                 );
             // Track signup + start first session.
-            final petId = ref.read(lifeEngineProvider).state?.id;
+            final petId = _lifeEngine.state?.id;
             if (petId != null) {
               AnalyticsClient.instance.signupCompleted(petId: petId);
               AnalyticsClient.instance.identify(petId);
               _sessionStart = DateTime.now();
               AnalyticsClient.instance.sessionStarted(petId: petId);
+              unawaited(RetentionService.instance.recordSignup(petId: petId));
+              unawaited(
+                RetentionService.instance.recordSessionStarted(petId: petId),
+              );
             }
             if (mounted) setState(() => _screen = _Screen.home);
           },
@@ -160,7 +185,7 @@ class _AppRouterState extends ConsumerState<AppRouter>
           onResetPet: () async {
             final petDao = ref.read(petDaoProvider);
             final chatDao = ref.read(chatDaoProvider);
-            final engine = ref.read(lifeEngineProvider);
+            final engine = _lifeEngine;
             engine.dispose();
             if (petState != null) {
               await chatDao.deleteAllForPet(petState.id);
@@ -188,7 +213,7 @@ class _AppRouterState extends ConsumerState<AppRouter>
       petState: petState,
       diaryEntries: entries,
       onChatTap: () => setState(() {
-        ref.read(lifeEngineProvider).isUserInteracting = true;
+        _lifeEngine.isUserInteracting = true;
         _screen = _Screen.chat;
       }),
       onSettingsTap: () => setState(() => _screen = _Screen.settings),
@@ -226,13 +251,20 @@ class _AppRouterState extends ConsumerState<AppRouter>
           riskLevel: result.riskLevel,
           crisisMessage: result.crisisMessage,
           emotion: result.emotion,
+          warningCode: result.warningCode,
         );
       },
       onBack: () => setState(() {
-        ref.read(lifeEngineProvider).isUserInteracting = false;
+        _lifeEngine.isUserInteracting = false;
         _screen = _Screen.home;
       }),
     );
+  }
+
+  void _ensureFcmBound(String petId) {
+    if (_boundFcmPetId == petId) return;
+    _boundFcmPetId = petId;
+    unawaited(FcmService.instance.bindPet(petId));
   }
 }
 

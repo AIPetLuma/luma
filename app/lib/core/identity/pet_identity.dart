@@ -37,7 +37,7 @@ class PetIdentity {
 
   /// Generate five-factor personality values.
   static Map<String, double> _generatePersonality(PersonalityPreset? preset) {
-    if (preset != null) return preset.values;
+    if (preset != null) return preset.traits;
 
     // Random personality with some variance.
     return {
@@ -57,7 +57,7 @@ enum PersonalityPreset {
   curious(
     label: 'Explorer',
     description: 'Curious, adventurous, always asking questions',
-    values: {
+    traits: {
       'openness': 0.8,
       'conscientiousness': 0.4,
       'extraversion': 0.6,
@@ -68,7 +68,7 @@ enum PersonalityPreset {
   gentle(
     label: 'Gentle Soul',
     description: 'Calm, caring, sensitive to your mood',
-    values: {
+    traits: {
       'openness': 0.5,
       'conscientiousness': 0.6,
       'extraversion': 0.3,
@@ -79,7 +79,7 @@ enum PersonalityPreset {
   playful(
     label: 'Playful Spirit',
     description: 'Energetic, mischievous, loves surprises',
-    values: {
+    traits: {
       'openness': 0.7,
       'conscientiousness': 0.3,
       'extraversion': 0.8,
@@ -90,7 +90,7 @@ enum PersonalityPreset {
   shy(
     label: 'Shy Dreamer',
     description: 'Quiet, imaginative, warms up slowly',
-    values: {
+    traits: {
       'openness': 0.6,
       'conscientiousness': 0.5,
       'extraversion': 0.2,
@@ -101,11 +101,11 @@ enum PersonalityPreset {
 
   final String label;
   final String description;
-  final Map<String, double> values;
+  final Map<String, double> traits;
 
   const PersonalityPreset({
     required this.label,
     required this.description,
-    required this.values,
+    required this.traits,
   });
 }

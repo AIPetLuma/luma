@@ -2,7 +2,37 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import '../../shared/constants.dart';
 
-/// Thin wrapper around the Claude / OpenAI-compatible chat API.
+/// Supported chat backends.
+enum LlmProvider {
+  anthropic,
+  openAiCompatible,
+}
+
+/// User-facing authentication/config error for LLM backends.
+class LlmAuthException implements Exception {
+  final String message;
+
+  const LlmAuthException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// User-facing HTTP error for LLM backend requests.
+class LlmHttpException implements Exception {
+  final int? statusCode;
+  final String message;
+
+  const LlmHttpException({
+    required this.statusCode,
+    required this.message,
+  });
+
+  @override
+  String toString() => message;
+}
+
+/// Thin wrapper around Anthropic and OpenAI-compatible chat APIs.
 ///
 /// MVP uses cloud LLM — no local model, no training needed.
 /// The pet's "personality" comes entirely from the system prompt
@@ -14,15 +44,47 @@ class LlmClient {
   final Dio _dio;
   final String _apiKey;
   final String _baseUrl;
+  final String _defaultModel;
+  final LlmProvider _provider;
   static final _rng = Random();
 
   LlmClient({
     required String apiKey,
-    String baseUrl = 'https://api.anthropic.com',
+    required LlmProvider provider,
+    String? baseUrl,
+    String? defaultModel,
     Dio? dio,
   })  : _apiKey = apiKey,
-        _baseUrl = baseUrl,
+        _provider = provider,
+        _baseUrl = _normalizeBaseUrl(
+          baseUrl ?? _defaultBaseUrlFor(provider),
+        ),
+        _defaultModel = (defaultModel != null && defaultModel.trim().isNotEmpty)
+            ? defaultModel.trim()
+            : _defaultModelFor(provider),
         _dio = dio ?? Dio();
+
+  static LlmProvider resolveProvider({
+    required String raw,
+    required String apiKey,
+    required String baseUrl,
+  }) {
+    final normalized = raw.trim().toLowerCase();
+    if (normalized == 'anthropic') return LlmProvider.anthropic;
+    if (normalized == 'openai' ||
+        normalized == 'openai-compatible' ||
+        normalized == 'openai_compatible') {
+      return LlmProvider.openAiCompatible;
+    }
+
+    final lowerApiKey = apiKey.toLowerCase();
+    final lowerBaseUrl = baseUrl.toLowerCase();
+    if (lowerApiKey.startsWith('sk-ant-') ||
+        lowerBaseUrl.contains('anthropic.com')) {
+      return LlmProvider.anthropic;
+    }
+    return LlmProvider.openAiCompatible;
+  }
 
   /// Send a chat completion request and return the assistant's reply.
   ///
@@ -30,33 +92,43 @@ class LlmClient {
   Future<String> chat({
     required String systemPrompt,
     required List<LlmMessage> messages,
-    String model = LumaConstants.defaultModel,
+    String? model,
     int maxTokens = LumaConstants.defaultMaxTokens,
     double temperature = 0.8,
   }) async {
-    try {
-      final response = await _dio.post(
-        '$_baseUrl/v1/messages',
-        options: Options(
-          headers: {
-            'x-api-key': _apiKey,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json',
-          },
-        ),
-        data: {
-          'model': model,
-          'max_tokens': maxTokens,
-          'temperature': temperature,
-          'system': systemPrompt,
-          'messages': messages.map((m) => m.toMap()).toList(),
-        },
-      );
+    final resolvedModel =
+        (model != null && model.trim().isNotEmpty) ? model.trim() : _defaultModel;
 
-      final content = response.data['content'] as List;
-      if (content.isEmpty) return _fallbackReply();
-      return (content.first['text'] as String?) ?? _fallbackReply();
-    } on DioException {
+    try {
+      switch (_provider) {
+        case LlmProvider.anthropic:
+          return await _chatAnthropic(
+            systemPrompt: systemPrompt,
+            messages: messages,
+            model: resolvedModel,
+            maxTokens: maxTokens,
+            temperature: temperature,
+          );
+        case LlmProvider.openAiCompatible:
+          return await _chatOpenAiCompatible(
+            systemPrompt: systemPrompt,
+            messages: messages,
+            model: resolvedModel,
+            maxTokens: maxTokens,
+            temperature: temperature,
+          );
+      }
+    } on LlmAuthException {
+      rethrow;
+    } on LlmHttpException {
+      rethrow;
+    } on DioException catch (e) {
+      if (_isHttpFailure(e)) {
+        throw LlmHttpException(
+          statusCode: e.response?.statusCode,
+          message: 'LLM request failed with HTTP ${e.response?.statusCode ?? 'unknown'}.',
+        );
+      }
       return _fallbackReply();
     } catch (_) {
       return _fallbackReply();
@@ -79,7 +151,6 @@ class LlmClient {
             '3 = explicit self-harm plan or ongoing crisis\n'
             'Reply with the digit only, nothing else.',
         messages: [LlmMessage(role: 'user', content: recentConversation)],
-        model: LumaConstants.defaultModel,
         maxTokens: 5,
         temperature: 0.0,
       );
@@ -130,6 +201,211 @@ class LlmClient {
       '*purrs softly*',
     ];
     return replies[_rng.nextInt(replies.length)];
+  }
+
+  Future<String> _chatAnthropic({
+    required String systemPrompt,
+    required List<LlmMessage> messages,
+    required String model,
+    required int maxTokens,
+    required double temperature,
+  }) async {
+    if (_apiKey.isEmpty) {
+      throw const LlmAuthException('LLM API key is missing.');
+    }
+
+    final response = await _dio.post(
+      _apiEndpoint('/messages'),
+      options: Options(
+        headers: {
+          'x-api-key': _apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+      ),
+      data: {
+        'model': model,
+        'max_tokens': maxTokens,
+        'temperature': temperature,
+        'system': systemPrompt,
+        'messages': messages.map((m) => m.toMap()).toList(),
+      },
+    );
+
+    final data = response.data;
+    if (data is! Map) return _fallbackReply();
+    final content = data['content'];
+    if (content is! List || content.isEmpty) return _fallbackReply();
+
+    final first = content.first;
+    if (first is! Map) return _fallbackReply();
+    final text = first['text'];
+    if (text is String && text.trim().isNotEmpty) return text;
+    return _fallbackReply();
+  }
+
+  Future<String> _chatOpenAiCompatible({
+    required String systemPrompt,
+    required List<LlmMessage> messages,
+    required String model,
+    required int maxTokens,
+    required double temperature,
+  }) async {
+    final headers = <String, String>{
+      'content-type': 'application/json',
+    };
+    if (_apiKey.isNotEmpty) {
+      headers['authorization'] = 'Bearer $_apiKey';
+    }
+
+    try {
+      final response = await _dio.post(
+        _apiEndpoint('/chat/completions'),
+        options: Options(headers: headers),
+        data: {
+          'model': model,
+          'max_tokens': maxTokens,
+          'temperature': temperature,
+          'messages': [
+            {'role': 'system', 'content': systemPrompt},
+            ...messages.map((m) => m.toMap()),
+          ],
+        },
+      );
+
+      final text = _extractOpenAiText(response.data);
+      if (text == null || text.trim().isEmpty) return _fallbackReply();
+      return text;
+    } on DioException catch (e) {
+      // Older/local Ollama versions may not expose /v1/chat/completions.
+      if (e.response?.statusCode == 404 && _looksLikeLocalOllama()) {
+        return _chatOllamaNative(
+          systemPrompt: systemPrompt,
+          messages: messages,
+          model: model,
+          temperature: temperature,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  String? _extractOpenAiText(dynamic data) {
+    if (data is! Map) return null;
+    final choices = data['choices'];
+    if (choices is! List || choices.isEmpty) return null;
+
+    final firstChoice = choices.first;
+    if (firstChoice is! Map) return null;
+    final message = firstChoice['message'];
+    if (message is! Map) return null;
+    return _extractMessageContent(message['content']);
+  }
+
+  String? _extractMessageContent(dynamic content) {
+    if (content is String) {
+      return content;
+    }
+    if (content is List) {
+      final buffer = StringBuffer();
+      for (final part in content) {
+        if (part is Map && part['text'] is String) {
+          buffer.write(part['text'] as String);
+        }
+      }
+      if (buffer.isNotEmpty) {
+        return buffer.toString();
+      }
+    }
+    return null;
+  }
+
+  Future<String> _chatOllamaNative({
+    required String systemPrompt,
+    required List<LlmMessage> messages,
+    required String model,
+    required double temperature,
+  }) async {
+    final response = await _dio.post(
+      '$_baseUrl/api/chat',
+      options: Options(
+        headers: {'content-type': 'application/json'},
+      ),
+      data: {
+        'model': model,
+        'stream': false,
+        'options': {
+          'temperature': temperature,
+        },
+        'messages': [
+          {'role': 'system', 'content': systemPrompt},
+          ...messages.map((m) => m.toMap()),
+        ],
+      },
+    );
+
+    final data = response.data;
+    if (data is! Map) return _fallbackReply();
+    final message = data['message'];
+    if (message is! Map) return _fallbackReply();
+    final content = message['content'];
+    if (content is String && content.trim().isNotEmpty) return content;
+    return _fallbackReply();
+  }
+
+  bool _looksLikeLocalOllama() {
+    final lower = _baseUrl.toLowerCase();
+    return lower.contains('127.0.0.1:11434') ||
+        lower.contains('localhost:11434');
+  }
+
+  bool _isHttpFailure(DioException e) {
+    final status = e.response?.statusCode;
+    if (status == null) return false;
+    return status >= 400 && status < 600;
+  }
+
+  String _apiEndpoint(String suffix) {
+    if (_hasVersionPrefix(_baseUrl)) {
+      return '$_baseUrl$suffix';
+    }
+    return '$_baseUrl/v1$suffix';
+  }
+
+  bool _hasVersionPrefix(String rawBaseUrl) {
+    final path = Uri.parse(rawBaseUrl).path.toLowerCase();
+    return path.endsWith('/v1') ||
+        path.contains('/v1/') ||
+        path.endsWith('/v1beta') ||
+        path.contains('/v1beta/') ||
+        path.endsWith('/v1alpha') ||
+        path.contains('/v1alpha/');
+  }
+
+  static String _normalizeBaseUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.endsWith('/')) {
+      return trimmed.substring(0, trimmed.length - 1);
+    }
+    return trimmed;
+  }
+
+  static String _defaultBaseUrlFor(LlmProvider provider) {
+    switch (provider) {
+      case LlmProvider.anthropic:
+        return 'https://api.anthropic.com';
+      case LlmProvider.openAiCompatible:
+        return 'https://api.openai.com';
+    }
+  }
+
+  static String _defaultModelFor(LlmProvider provider) {
+    switch (provider) {
+      case LlmProvider.anthropic:
+        return LumaConstants.defaultModel;
+      case LlmProvider.openAiCompatible:
+        return 'gpt-4o-mini';
+    }
   }
 }
 
