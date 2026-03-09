@@ -15,6 +15,16 @@ import '../data/models/pet_state.dart';
 import '../data/remote/llm_client.dart';
 import '../features/chat/chat_controller.dart';
 
+String _compileTimeApiKey() {
+  const generic = String.fromEnvironment('LLM_API_KEY');
+  if (generic.isNotEmpty) return generic;
+
+  const anthropic = String.fromEnvironment('ANTHROPIC_API_KEY');
+  if (anthropic.isNotEmpty) return anthropic;
+
+  return const String.fromEnvironment('OPENAI_API_KEY');
+}
+
 // ── Singletons ──
 
 final petDaoProvider = Provider((_) => PetDao());
@@ -27,19 +37,13 @@ final crisisDetectorProvider = Provider((_) => CrisisDetector());
 final apiKeyProvider = FutureProvider<String>((ref) async {
   final stored = await SecureStorage.getApiKey();
   if (stored != null && stored.isNotEmpty) return stored;
-
-  const generic = String.fromEnvironment('LLM_API_KEY');
-  if (generic.isNotEmpty) return generic;
-
-  const anthropic = String.fromEnvironment('ANTHROPIC_API_KEY');
-  if (anthropic.isNotEmpty) return anthropic;
-
-  return const String.fromEnvironment('OPENAI_API_KEY');
+  return _compileTimeApiKey();
 });
 
 final llmClientProvider = Provider((ref) {
   final apiKeyAsync = ref.watch(apiKeyProvider);
-  final apiKey = apiKeyAsync.valueOrNull ?? '';
+  // While secure storage is still loading, avoid empty-key first requests.
+  final apiKey = apiKeyAsync.valueOrNull ?? _compileTimeApiKey();
   const rawProvider = String.fromEnvironment('LLM_PROVIDER', defaultValue: 'auto');
   const baseUrl = String.fromEnvironment('LLM_BASE_URL');
   const model = String.fromEnvironment('LLM_MODEL');

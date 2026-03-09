@@ -185,6 +185,18 @@ class _ChatScreenState extends State<ChatScreen> {
       message = status == null
           ? t.httpRequestFailedUnknown
           : t.httpRequestFailedWithStatus(status);
+    } else if (warningCode == kChatWarningLlmTimeout) {
+      message = t.llmTimeoutWarning;
+    } else if (warningCode == kChatWarningLlmNetwork) {
+      message = t.llmNetworkWarning;
+    } else if (warningCode == kChatWarningLlmTls) {
+      message = t.llmTlsWarning;
+    } else if (warningCode == kChatWarningLlmCancelled) {
+      message = t.llmCancelledWarning;
+    } else if (warningCode == kChatWarningLlmMalformed) {
+      message = t.llmMalformedResponseWarning;
+    } else if (warningCode == kChatWarningLlmUnknown) {
+      message = t.llmUnknownWarning;
     } else {
       message = t.sendMessageFailed;
     }
@@ -340,6 +352,7 @@ class _InputBar extends StatelessWidget {
         children: [
           Expanded(
             child: TextField(
+              key: const Key('chat_input_field'),
               controller: controller,
               maxLines: 4,
               minLines: 1,
@@ -371,6 +384,7 @@ class _InputBar extends StatelessWidget {
                   ),
                 )
               : IconButton(
+                  key: const Key('chat_send_button'),
                   icon: Icon(
                     Icons.send_rounded,
                     color: theme.colorScheme.primary,

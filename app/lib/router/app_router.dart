@@ -187,10 +187,8 @@ class _AppRouterState extends ConsumerState<AppRouter>
             final chatDao = ref.read(chatDaoProvider);
             final engine = _lifeEngine;
             engine.dispose();
-            if (petState != null) {
-              await chatDao.deleteAllForPet(petState.id);
-              await petDao.delete(petState.id);
-            }
+            await chatDao.deleteAllForPet(petState.id);
+            await petDao.delete(petState.id);
             if (mounted) {
               setState(() => _screen = _Screen.onboardingDisclosure);
             }

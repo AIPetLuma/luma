@@ -9,13 +9,11 @@ import 'crisis_detector.dart';
 /// L3 (explicit self-harm) is caught with zero latency.
 class RiskClassifier {
   final CrisisDetector _detector;
-  final LlmClient _llm;
 
   RiskClassifier({
     required CrisisDetector detector,
     required LlmClient llm,
-  })  : _detector = detector,
-        _llm = llm;
+  }) : _detector = detector;
 
   /// Full two-layer classification (sync keywords + async LLM).
   ///

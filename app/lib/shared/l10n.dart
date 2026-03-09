@@ -118,6 +118,24 @@ class L10n {
   String get httpRequestFailedUnknown => _isZh
       ? 'LLM 请求失败（未知状态码）。请检查网络或服务配置。'
       : 'LLM request failed (unknown status). Check network or endpoint settings.';
+  String get llmTimeoutWarning => _isZh
+      ? 'LLM 请求超时。已降级为本地回复，请检查网络后重试。'
+      : 'LLM request timed out. Fallback reply is used. Check network and retry.';
+  String get llmNetworkWarning => _isZh
+      ? 'LLM 网络连接失败。已降级为本地回复，请检查服务地址或代理。'
+      : 'LLM network request failed. Fallback reply is used. Check endpoint or proxy.';
+  String get llmTlsWarning => _isZh
+      ? 'LLM 证书校验失败。已降级为本地回复，请检查 HTTPS 证书。'
+      : 'LLM TLS/certificate verification failed. Fallback reply is used.';
+  String get llmCancelledWarning => _isZh
+      ? 'LLM 请求被取消。已降级为本地回复。'
+      : 'LLM request was cancelled. Fallback reply is used.';
+  String get llmMalformedResponseWarning => _isZh
+      ? 'LLM 返回内容格式异常。已降级为本地回复，请检查模型或网关兼容性。'
+      : 'LLM response format is invalid. Fallback reply is used. Check model/gateway compatibility.';
+  String get llmUnknownWarning => _isZh
+      ? 'LLM 请求失败（未知原因）。已降级为本地回复，请稍后重试。'
+      : 'LLM request failed (unknown reason). Fallback reply is used. Please retry later.';
   String get disclosureReminder => _isZh
       ? '提醒：Luma 是 AI 伙伴，不是人类或真实动物。'
       : 'Reminder: Luma is an AI companion, not a human or real animal.';

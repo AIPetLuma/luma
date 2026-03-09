@@ -22,7 +22,7 @@ BUILD_TARGET ?= linux
 .PHONY: help \
 	up newup ship sup fullpr-sub fullpr-main sync sync-sub-main new branch-check \
 	secrets-init secrets-check api-run demo-run smoke-api-secrets deploy-fuji \
-	flutter-run flutter-build fr fb
+	flutter-run flutter-build fr fb p1-check
 
 # 默认命令：输入 make 就会显示帮助
 help:
@@ -47,6 +47,8 @@ help:
 	@echo "--- Flutter 配置缩写命令 ---"
 	@echo "make fr                         # 读取 dev.json 并运行 (默认 linux)"
 	@echo "make fb                         # 读取 dev.json 并构建 (默认 linux)"
+	@echo "make p1-check                   # 执行 P1 发布就绪检查"
+	@echo "RUN_FLUTTER_CHECKS=1 make p1-check # 额外执行 analyze + 核心回归"
 	@echo "make fr RUN_DEVICE=windows      # 指定运行设备"
 	@echo "make fb BUILD_TARGET=apk        # 指定构建目标"
 	@echo "make fr DEFINE_FILE=dev.local.json # 指定配置文件"
@@ -95,6 +97,10 @@ flutter-build:
 # 缩写命令
 fr: flutter-run
 fb: flutter-build
+
+# P1 发布就绪检查
+p1-check:
+	@bash scripts/check_release_readiness.sh
 
 # 1. 基础提交
 up:

@@ -1,5 +1,3 @@
-import 'dart:math';
-
 /// Manages gradual personality evolution over time.
 ///
 /// Personality traits shift slowly based on interaction patterns —
@@ -8,7 +6,6 @@ import 'dart:math';
 /// personality is visibly shaped by the relationship.
 class PersonalityEvolver {
   static const _evolutionRate = 0.002; // per interaction, very slow
-  static const _maxShift = 0.15; // max shift from initial value per month
 
   /// Nudge personality based on an interaction pattern.
   ///

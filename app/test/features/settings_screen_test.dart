@@ -13,7 +13,7 @@ import 'package:luma/data/models/emotion.dart';
 // - 校验设置页中的身份信息、披露信息与危机资源入口。
 // - 聚焦用户可见合规模块，防止回归。
 void main() {
-  PetState _makePet() => PetState(
+  PetState makePet() => PetState(
         id: 'test',
         name: 'Luna',
         birthday: DateTime.now().subtract(const Duration(days: 3)),
@@ -33,7 +33,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: SettingsScreen(
-            petState: _makePet(),
+            petState: makePet(),
             onBack: () {},
             onResetPet: () {},
             onApiKeyChanged: (_) {},
@@ -52,7 +52,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: SettingsScreen(
-            petState: _makePet(),
+            petState: makePet(),
             onBack: () {},
             onResetPet: () {},
             onApiKeyChanged: (_) {},
@@ -70,7 +70,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: SettingsScreen(
-            petState: _makePet(),
+            petState: makePet(),
             onBack: () {},
             onResetPet: () {},
             onApiKeyChanged: (_) {},
