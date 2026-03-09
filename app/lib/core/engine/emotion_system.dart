@@ -9,8 +9,15 @@ import '../../shared/constants.dart';
 /// directly affect Luma's behaviour (reply length, speed, tone,
 /// willingness to respond). This is the core distinction between
 /// "performing" and "being alive".
+///
+/// V2 enhancements:
+/// - Emotional inertia (extreme emotions resist change)
+/// - Event fatigue / habituation (repeated events have less impact)
 class EmotionSystem {
   final _rng = Random();
+
+  /// Tracks how many times each event type has fired recently.
+  final Map<EmotionEvent, int> _eventCounts = {};
 
   /// Advance emotion state by [minutes], decaying toward baseline
   /// and adjusting based on current needs.
@@ -56,64 +63,98 @@ class EmotionSystem {
     e.valence += (_rng.nextDouble() - 0.5) * 0.002 * minutes;
     e.arousal += (_rng.nextDouble() - 0.5) * 0.002 * minutes;
 
+    // Slowly decay event fatigue over time (1 count per ~30 min).
+    if (minutes > 10) {
+      _decayEventFatigue(minutes);
+    }
+
     e.clamp();
     return e;
   }
 
   /// Immediate emotion shift from an interaction event.
+  ///
+  /// V2: Applies emotional inertia and event fatigue.
   Emotion onEvent(Emotion current, EmotionEvent event) {
     final e = current.copyWith();
 
-    switch (event) {
-      case EmotionEvent.userReturned:
-        // Reunion — happiness spike proportional to how long apart.
-        e.valence += 0.3;
-        e.arousal += 0.2;
-        break;
+    // ── Get raw deltas for this event ──
+    final raw = _rawEventDelta(event);
 
-      case EmotionEvent.positiveChat:
-        e.valence += 0.1;
-        e.arousal += 0.05;
-        break;
+    // ── Event fatigue: repeated events have less impact ──
+    _eventCounts[event] = (_eventCounts[event] ?? 0) + 1;
+    final count = _eventCounts[event]!;
+    final fatigueFactor = _eventFatigueFactor(count);
 
-      case EmotionEvent.negativeChat:
-        e.valence -= 0.2;
-        e.arousal += 0.1; // agitated
-        break;
+    // ── Emotional inertia: extreme emotions resist change ──
+    final valenceInertia = _inertiaFactor(e.valence, raw.valence);
+    final arousalInertia = _inertiaFactor(e.arousal - 0.5, raw.arousal);
 
-      case EmotionEvent.newTopicShared:
-        e.valence += 0.05;
-        e.arousal += 0.15; // curiosity spike
-        break;
-
-      case EmotionEvent.harmDetected:
-        // Welfare trigger — significant negative shift.
-        e.valence -= 0.4;
-        e.arousal -= 0.2; // withdrawal, not agitation
-        break;
-
-      case EmotionEvent.longSilence:
-        e.valence -= 0.05;
-        e.arousal -= 0.1;
-        break;
-    }
+    e.valence += raw.valence * fatigueFactor * valenceInertia;
+    e.arousal += raw.arousal * fatigueFactor * arousalInertia;
 
     e.clamp();
     return e;
+  }
+
+  /// Reset event fatigue counters (e.g. after a long break).
+  void resetEventFatigue() {
+    _eventCounts.clear();
+  }
+
+  /// Raw event impact values (before inertia and fatigue).
+  _EmotionDelta _rawEventDelta(EmotionEvent event) {
+    return switch (event) {
+      EmotionEvent.userReturned => const _EmotionDelta(0.3, 0.2),
+      EmotionEvent.positiveChat => const _EmotionDelta(0.1, 0.05),
+      EmotionEvent.negativeChat => const _EmotionDelta(-0.2, 0.1),
+      EmotionEvent.newTopicShared => const _EmotionDelta(0.05, 0.15),
+      EmotionEvent.harmDetected => const _EmotionDelta(-0.4, -0.2),
+      EmotionEvent.longSilence => const _EmotionDelta(-0.05, -0.1),
+    };
+  }
+
+  /// Inertia factor: extreme emotions resist change.
+  ///
+  /// Returns a multiplier in (0, 1]. More extreme currentVal means
+  /// more resistance to change in the same direction.
+  double _inertiaFactor(double currentVal, double deltaVal) {
+    // If delta pushes further from center, apply resistance
+    if (currentVal.sign == deltaVal.sign && currentVal.abs() > 0.3) {
+      // Resistance grows with how extreme the current value is
+      return max(0.3, 1.0 - pow(currentVal.abs(), 1.5) * 0.5);
+    }
+    // If delta pulls back toward center, no extra resistance
+    return 1.0;
+  }
+
+  /// Event fatigue: the Nth occurrence of the same event has less impact.
+  ///
+  /// Returns a multiplier in [0.3, 1.0].
+  double _eventFatigueFactor(int count) {
+    return max(0.3, 1.0 - (count - 1) * 0.12);
+  }
+
+  /// Gradually decay event counts over time.
+  void _decayEventFatigue(double minutes) {
+    final decayAmount = (minutes / 30).floor();
+    if (decayAmount <= 0) return;
+    for (final key in _eventCounts.keys.toList()) {
+      _eventCounts[key] = max(0, _eventCounts[key]! - decayAmount);
+      if (_eventCounts[key] == 0) _eventCounts.remove(key);
+    }
   }
 
   /// How many extra milliseconds to delay the reply (fatigue/sadness).
   int replyDelayMs(Emotion emotion, Needs needs) {
     var delay = LumaConstants.replyDelayBaseMs;
 
-    // Tired → slower replies.
     if (needs.fatigue > 0.7) {
       delay += ((needs.fatigue - 0.7) / 0.3 *
               LumaConstants.replyDelayFatigueExtraMs)
           .round();
     }
 
-    // Melancholy → slightly slower.
     if (emotion.valence < -0.3) {
       delay += 1500;
     }
@@ -153,4 +194,10 @@ enum EmotionEvent {
   newTopicShared,
   harmDetected,
   longSilence,
+}
+
+class _EmotionDelta {
+  final double valence;
+  final double arousal;
+  const _EmotionDelta(this.valence, this.arousal);
 }

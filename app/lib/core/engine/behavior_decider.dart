@@ -1,35 +1,53 @@
-import '../../data/models/emotion.dart';
-import '../../data/models/need.dart';
+import 'dart:math';
 import '../../data/models/pet_state.dart';
 
 /// Translates the pet's internal state into concrete behaviour decisions.
 ///
-/// This is where "emotions drive behaviour" becomes real — the decider
-/// determines whether the pet should initiate contact, refuse to respond,
-/// generate a diary entry, or adjust its conversation style.
+/// V2 enhancements:
+/// - Probabilistic decisions (sigmoid-based probability instead of hard thresholds)
+/// - Personality modulates action probability
+/// - Safety-critical actions (withdraw, sleep) remain deterministic
 class BehaviorDecider {
+  final Random _rng;
+
+  BehaviorDecider({Random? random}) : _rng = random ?? Random();
+
   /// Evaluate what actions the pet should take right now.
   BehaviorDecision evaluate(PetState state) {
     final actions = <PetAction>[];
+    final extraversion = state.personality['extraversion'] ?? 0.5;
 
-    // ── Should the pet reach out to the owner? ──
-    if (state.needs.loneliness >= 0.8) {
-      actions.add(PetAction.reachOut);
+    // ── Deterministic: withdraw (safety-critical welfare mechanism) ──
+    if (state.emotion.mayRefuseResponse || state.needs.security < 0.2) {
+      actions.add(PetAction.withdraw);
     }
 
-    // ── Should the pet generate a diary entry? ──
-    if (state.needs.curiosity > 0.7 && state.emotion.arousal > 0.4) {
-      actions.add(PetAction.writeDiary);
-    }
-
-    // ── Should the pet enter sleep mode? ──
+    // ── Deterministic: sleep at extreme fatigue ──
     if (state.needs.fatigue >= 0.9) {
       actions.add(PetAction.sleep);
     }
 
-    // ── Should the pet withdraw (welfare mechanism)? ──
-    if (state.emotion.mayRefuseResponse || state.needs.security < 0.2) {
-      actions.add(PetAction.withdraw);
+    // ── Probabilistic: reach out ──
+    if (!actions.contains(PetAction.withdraw) &&
+        !actions.contains(PetAction.sleep)) {
+      final reachOutProb = _sigmoid(
+            (state.needs.loneliness - 0.6) * 6,
+          ) *
+          (0.7 + extraversion * 0.6); // Extraverts reach out more
+      if (_rng.nextDouble() < reachOutProb) {
+        actions.add(PetAction.reachOut);
+      }
+
+      // ── Probabilistic: write diary ──
+      if (state.needs.curiosity > 0.5 && state.emotion.arousal > 0.3) {
+        final diaryProb = _sigmoid(
+          (state.needs.curiosity - 0.5) * 4 +
+              (state.emotion.arousal - 0.3) * 3,
+        ) * 0.7;
+        if (_rng.nextDouble() < diaryProb) {
+          actions.add(PetAction.writeDiary);
+        }
+      }
     }
 
     return BehaviorDecision(
@@ -43,33 +61,27 @@ class BehaviorDecider {
     final emotion = state.emotion;
     final needs = state.needs;
 
-    // Withdrawn — minimal responses.
     if (emotion.mayRefuseResponse) {
       return ConversationStyle.withdrawn;
     }
-
-    // Very tired — brief and slow.
     if (needs.fatigue >= 0.8) {
       return ConversationStyle.sleepy;
     }
-
-    // Sad / lonely — short, quiet.
     if (emotion.valence < -0.3) {
       return ConversationStyle.melancholy;
     }
-
-    // Curious and energetic — chatty, asks questions.
     if (needs.curiosity > 0.6 && emotion.arousal > 0.4) {
       return ConversationStyle.curious;
     }
-
-    // Happy — warm and engaged.
     if (emotion.valence > 0.3) {
       return ConversationStyle.happy;
     }
 
     return ConversationStyle.neutral;
   }
+
+  /// Sigmoid function for smooth probability transition.
+  double _sigmoid(double x) => 1.0 / (1.0 + exp(-x));
 }
 
 class BehaviorDecision {
