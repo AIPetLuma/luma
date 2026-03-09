@@ -32,14 +32,29 @@ class LlmHttpException implements Exception {
   String toString() => message;
 }
 
+/// User-facing runtime error for non-HTTP LLM failures.
+class LlmRuntimeException implements Exception {
+  final String reasonCode;
+  final String message;
+
+  const LlmRuntimeException({
+    required this.reasonCode,
+    required this.message,
+  });
+
+  @override
+  String toString() => message;
+}
+
 /// Thin wrapper around Anthropic and OpenAI-compatible chat APIs.
 ///
 /// MVP uses cloud LLM — no local model, no training needed.
 /// The pet's "personality" comes entirely from the system prompt
 /// injected by [ChatController].
 ///
-/// Includes graceful degradation: if the API call fails, returns
-/// a local fallback response so the chat never dies.
+/// Interactive chat failures are surfaced to caller with typed exceptions
+/// so UI can show precise error reasons. Non-interactive flows (summary/diary)
+/// still degrade gracefully with local fallback text.
 class LlmClient {
   final Dio _dio;
   final String _apiKey;
@@ -88,7 +103,7 @@ class LlmClient {
 
   /// Send a chat completion request and return the assistant's reply.
   ///
-  /// On failure, returns a local fallback response instead of throwing.
+  /// Throws typed exceptions on failure so caller can decide how to degrade.
   Future<String> chat({
     required String systemPrompt,
     required List<LlmMessage> messages,
@@ -122,6 +137,8 @@ class LlmClient {
       rethrow;
     } on LlmHttpException {
       rethrow;
+    } on LlmRuntimeException {
+      rethrow;
     } on DioException catch (e) {
       if (_isHttpFailure(e)) {
         throw LlmHttpException(
@@ -129,9 +146,15 @@ class LlmClient {
           message: 'LLM request failed with HTTP ${e.response?.statusCode ?? 'unknown'}.',
         );
       }
-      return _fallbackReply();
+      throw LlmRuntimeException(
+        reasonCode: _runtimeReasonFromDio(e),
+        message: _runtimeMessageFromDio(e),
+      );
     } catch (_) {
-      return _fallbackReply();
+      throw const LlmRuntimeException(
+        reasonCode: 'unknown',
+        message: 'Unexpected LLM error.',
+      );
     }
   }
 
@@ -164,30 +187,38 @@ class LlmClient {
 
   /// Generate a conversation summary for memory compression.
   Future<String> summariseConversation(String conversation) async {
-    return chat(
-      systemPrompt:
-          'Summarise the following conversation between a user and their AI '
-          'pet in 1-3 sentences. Focus on: what topics were discussed, '
-          'how the user seemed to feel, and any important events. '
-          'Write from the pet\'s perspective (first person).',
-      messages: [LlmMessage(role: 'user', content: conversation)],
-      maxTokens: 150,
-      temperature: 0.3,
-    );
+    try {
+      return await chat(
+        systemPrompt:
+            'Summarise the following conversation between a user and their AI '
+            'pet in 1-3 sentences. Focus on: what topics were discussed, '
+            'how the user seemed to feel, and any important events. '
+            'Write from the pet\'s perspective (first person).',
+        messages: [LlmMessage(role: 'user', content: conversation)],
+        maxTokens: 150,
+        temperature: 0.3,
+      );
+    } catch (_) {
+      return 'I spent time with my owner today and tried to understand how they felt.';
+    }
   }
 
   /// Generate a diary entry from state hints.
   Future<String> generateDiaryEntry(String stateHints) async {
-    return chat(
-      systemPrompt:
-          'You are an AI pet writing a short diary entry (1-2 sentences). '
-          'You are writing about what you did or felt while your owner '
-          'was away. Be gentle, slightly whimsical, and authentic to '
-          'your current mood. Do not mention being an AI.',
-      messages: [LlmMessage(role: 'user', content: stateHints)],
-      maxTokens: 80,
-      temperature: 0.9,
-    );
+    try {
+      return await chat(
+        systemPrompt:
+            'You are an AI pet writing a short diary entry (1-2 sentences). '
+            'You are writing about what you did or felt while your owner '
+            'was away. Be gentle, slightly whimsical, and authentic to '
+            'your current mood. Do not mention being an AI.',
+        messages: [LlmMessage(role: 'user', content: stateHints)],
+        maxTokens: 80,
+        temperature: 0.9,
+      );
+    } catch (_) {
+      return 'Today felt quiet, but I stayed close and waited for my owner.';
+    }
   }
 
   /// Local fallback when API is unavailable.
@@ -202,6 +233,8 @@ class LlmClient {
     ];
     return replies[_rng.nextInt(replies.length)];
   }
+
+  static String localFallbackReply() => _fallbackReply();
 
   Future<String> _chatAnthropic({
     required String systemPrompt,
@@ -233,15 +266,33 @@ class LlmClient {
     );
 
     final data = response.data;
-    if (data is! Map) return _fallbackReply();
+    if (data is! Map) {
+      throw const LlmRuntimeException(
+        reasonCode: 'malformed_response',
+        message: 'LLM returned an unexpected payload.',
+      );
+    }
     final content = data['content'];
-    if (content is! List || content.isEmpty) return _fallbackReply();
+    if (content is! List || content.isEmpty) {
+      throw const LlmRuntimeException(
+        reasonCode: 'malformed_response',
+        message: 'LLM returned empty content.',
+      );
+    }
 
     final first = content.first;
-    if (first is! Map) return _fallbackReply();
+    if (first is! Map) {
+      throw const LlmRuntimeException(
+        reasonCode: 'malformed_response',
+        message: 'LLM response content is invalid.',
+      );
+    }
     final text = first['text'];
     if (text is String && text.trim().isNotEmpty) return text;
-    return _fallbackReply();
+    throw const LlmRuntimeException(
+      reasonCode: 'malformed_response',
+      message: 'LLM response text is empty.',
+    );
   }
 
   Future<String> _chatOpenAiCompatible({
@@ -251,6 +302,10 @@ class LlmClient {
     required int maxTokens,
     required double temperature,
   }) async {
+    if (_apiKey.isEmpty && !_allowsAnonymousOpenAiCompatible()) {
+      throw const LlmAuthException('LLM API key is missing.');
+    }
+
     final headers = <String, String>{
       'content-type': 'application/json',
     };
@@ -274,7 +329,12 @@ class LlmClient {
       );
 
       final text = _extractOpenAiText(response.data);
-      if (text == null || text.trim().isEmpty) return _fallbackReply();
+      if (text == null || text.trim().isEmpty) {
+        throw const LlmRuntimeException(
+          reasonCode: 'malformed_response',
+          message: 'LLM returned empty response content.',
+        );
+      }
       return text;
     } on DioException catch (e) {
       // Older/local Ollama versions may not expose /v1/chat/completions.
@@ -345,12 +405,25 @@ class LlmClient {
     );
 
     final data = response.data;
-    if (data is! Map) return _fallbackReply();
+    if (data is! Map) {
+      throw const LlmRuntimeException(
+        reasonCode: 'malformed_response',
+        message: 'LLM returned an unexpected payload.',
+      );
+    }
     final message = data['message'];
-    if (message is! Map) return _fallbackReply();
+    if (message is! Map) {
+      throw const LlmRuntimeException(
+        reasonCode: 'malformed_response',
+        message: 'LLM message payload is invalid.',
+      );
+    }
     final content = message['content'];
     if (content is String && content.trim().isNotEmpty) return content;
-    return _fallbackReply();
+    throw const LlmRuntimeException(
+      reasonCode: 'malformed_response',
+      message: 'LLM message text is empty.',
+    );
   }
 
   bool _looksLikeLocalOllama() {
@@ -359,10 +432,44 @@ class LlmClient {
         lower.contains('localhost:11434');
   }
 
+  bool _allowsAnonymousOpenAiCompatible() {
+    final uri = Uri.tryParse(_baseUrl);
+    final host = (uri?.host ?? '').toLowerCase();
+    return host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '0.0.0.0';
+  }
+
   bool _isHttpFailure(DioException e) {
     final status = e.response?.statusCode;
     if (status == null) return false;
     return status >= 400 && status < 600;
+  }
+
+  String _runtimeReasonFromDio(DioException e) {
+    return switch (e.type) {
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout =>
+        'timeout',
+      DioExceptionType.connectionError => 'network',
+      DioExceptionType.badCertificate => 'tls',
+      DioExceptionType.cancel => 'cancelled',
+      _ => 'network',
+    };
+  }
+
+  String _runtimeMessageFromDio(DioException e) {
+    return switch (e.type) {
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout =>
+        'LLM request timed out.',
+      DioExceptionType.connectionError => 'LLM endpoint is unreachable.',
+      DioExceptionType.badCertificate => 'LLM endpoint certificate is invalid.',
+      DioExceptionType.cancel => 'LLM request was cancelled.',
+      _ => 'LLM request failed due to network/runtime error.',
+    };
   }
 
   String _apiEndpoint(String suffix) {

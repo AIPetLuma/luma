@@ -6,7 +6,6 @@ import '../../data/models/emotion.dart';
 import '../../shared/constants.dart';
 import 'need_system.dart';
 import 'emotion_system.dart';
-import 'behavior_decider.dart';
 
 /// Simulates the passage of time while the user was away.
 ///
@@ -17,16 +16,13 @@ import 'behavior_decider.dart';
 class TimeSimulator {
   final NeedSystem _needSystem;
   final EmotionSystem _emotionSystem;
-  final BehaviorDecider _behaviorDecider;
   final _rng = Random();
 
   TimeSimulator({
     NeedSystem? needSystem,
     EmotionSystem? emotionSystem,
-    BehaviorDecider? behaviorDecider,
   })  : _needSystem = needSystem ?? NeedSystem(),
-        _emotionSystem = emotionSystem ?? EmotionSystem(),
-        _behaviorDecider = behaviorDecider ?? BehaviorDecider();
+        _emotionSystem = emotionSystem ?? EmotionSystem();
 
   /// Simulate [elapsedMinutes] of offline time, returning the updated
   /// pet state and any diary entries generated.
@@ -42,7 +38,7 @@ class TimeSimulator {
     var emotion = state.emotion.copyWith();
 
     // Simulate in 30-minute chunks for efficiency with some granularity.
-    final chunkSize = 30;
+    const chunkSize = 30;
     final chunks = (cappedMinutes / chunkSize).ceil();
 
     for (var i = 0; i < chunks; i++) {

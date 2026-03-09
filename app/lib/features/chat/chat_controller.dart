@@ -13,6 +13,12 @@ import '../../data/remote/llm_client.dart';
 
 const kChatWarningInvalidApiKey = 'invalid_api_key';
 const kChatWarningHttpErrorPrefix = 'http_error_';
+const kChatWarningLlmTimeout = 'llm_timeout';
+const kChatWarningLlmNetwork = 'llm_network';
+const kChatWarningLlmTls = 'llm_tls';
+const kChatWarningLlmCancelled = 'llm_cancelled';
+const kChatWarningLlmMalformed = 'llm_malformed_response';
+const kChatWarningLlmUnknown = 'llm_unknown';
 
 /// Orchestrates the full chat flow:
 ///   user input → crisis check → prompt assembly → LLM call → state update
@@ -97,31 +103,31 @@ class ChatController {
 
     // L2 crisis — reply with care + resource card.
     if (riskLevel == 2) {
+      String gentleReply;
+      String? warningCode;
       try {
-        final gentleReply = await _generateReply(state, userText, crisis: true);
-        _engine.onUserInteraction(InteractionType.chat);
-        analytics.crisisResourceShown(level: 2);
-        return ChatResult(
-          reply: gentleReply,
-          isCrisis: true,
-          riskLevel: 2,
-          crisisMessage: _crisisDetector.getResourceMessage(2),
-        );
+        gentleReply = await _generateReply(state, userText, crisis: true);
       } on LlmAuthException {
-        return const ChatResult(
-          reply: '',
-          isCrisis: false,
-          riskLevel: 0,
-          warningCode: kChatWarningInvalidApiKey,
-        );
+        gentleReply = LlmClient.localFallbackReply();
+        warningCode = kChatWarningInvalidApiKey;
       } on LlmHttpException catch (e) {
-        return ChatResult(
-          reply: '',
-          isCrisis: false,
-          riskLevel: 0,
-          warningCode: _httpWarningCode(e.statusCode),
-        );
+        gentleReply = LlmClient.localFallbackReply();
+        warningCode = _httpWarningCode(e.statusCode);
+      } on LlmRuntimeException catch (e) {
+        gentleReply = LlmClient.localFallbackReply();
+        warningCode = _runtimeWarningCode(e.reasonCode);
       }
+
+      await _saveReply(state, gentleReply, riskLevel);
+      _engine.onUserInteraction(InteractionType.chat);
+      analytics.crisisResourceShown(level: 2);
+      return ChatResult(
+        reply: gentleReply,
+        isCrisis: true,
+        riskLevel: 2,
+        crisisMessage: _crisisDetector.getResourceMessage(2),
+        warningCode: warningCode,
+      );
     }
 
     // ── 3. Check if pet is withdrawn (welfare) ──
@@ -133,22 +139,18 @@ class ChatController {
 
     // ── 4. Normal reply ──
     String reply;
+    String? warningCode;
     try {
       reply = await _generateReply(state, userText);
     } on LlmAuthException {
-      return const ChatResult(
-        reply: '',
-        isCrisis: false,
-        riskLevel: 0,
-        warningCode: kChatWarningInvalidApiKey,
-      );
+      reply = LlmClient.localFallbackReply();
+      warningCode = kChatWarningInvalidApiKey;
     } on LlmHttpException catch (e) {
-      return ChatResult(
-        reply: '',
-        isCrisis: false,
-        riskLevel: 0,
-        warningCode: _httpWarningCode(e.statusCode),
-      );
+      reply = LlmClient.localFallbackReply();
+      warningCode = _httpWarningCode(e.statusCode);
+    } on LlmRuntimeException catch (e) {
+      reply = LlmClient.localFallbackReply();
+      warningCode = _runtimeWarningCode(e.reasonCode);
     }
     await _saveReply(state, reply, riskLevel);
 
@@ -173,6 +175,7 @@ class ChatController {
       riskLevel: riskLevel,
       crisisMessage: softHint,
       emotion: state.emotion.label,
+      warningCode: warningCode,
     );
   }
 
@@ -288,6 +291,17 @@ class ChatController {
       return '${kChatWarningHttpErrorPrefix}unknown';
     }
     return '$kChatWarningHttpErrorPrefix$statusCode';
+  }
+
+  String _runtimeWarningCode(String reasonCode) {
+    return switch (reasonCode) {
+      'timeout' => kChatWarningLlmTimeout,
+      'network' => kChatWarningLlmNetwork,
+      'tls' => kChatWarningLlmTls,
+      'cancelled' => kChatWarningLlmCancelled,
+      'malformed_response' => kChatWarningLlmMalformed,
+      _ => kChatWarningLlmUnknown,
+    };
   }
 
   /// Call when the conversation session ends (app backgrounded, etc.)

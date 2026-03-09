@@ -2,6 +2,11 @@
 
 Luma 是一款 AI 宠物陪伴应用，核心理念是“它在你不在时也活着”。
 
+## 合规文档入口（草案）
+
+- 隐私政策：`legal/privacy_policy.md`
+- 服务条款：`legal/terms_of_service.md`
+
 ## 目录导航
 
 - [第一部分：商业版（面向使用者）](#第一部分商业版面向使用者)
@@ -194,6 +199,12 @@ Firebase 远程推送还需要平台配置文件：
 
 - `app/android/app/google-services.json`
 - `app/ios/Runner/GoogleService-Info.plist`
+
+Android 发布签名（上传到 Google Play 前必须配置）：
+
+1. 复制模板：`cp app/android/key.properties.example app/android/key.properties`
+2. 在 `app/android/key.properties` 填入真实 keystore 信息。
+3. 确保 `storeFile` 指向存在的 `.jks` 文件（该文件不要提交到仓库）。
 
 ### 5. 后端与云能力（Phase G）
 

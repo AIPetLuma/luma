@@ -1,5 +1,3 @@
-import '../../data/models/emotion.dart';
-import '../../data/models/need.dart';
 import '../../data/models/pet_state.dart';
 
 /// Translates the pet's internal state into concrete behaviour decisions.

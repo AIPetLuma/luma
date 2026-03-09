@@ -1,4 +1,4 @@
-package com.example.luma
+package ai.luma.app
 
 import io.flutter.embedding.android.FlutterActivity
 
