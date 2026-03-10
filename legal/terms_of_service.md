@@ -44,4 +44,4 @@
 
 ## 9. 联系方式
 
-- 支持邮箱：`support@your-domain.com`
+- 支持邮箱：`19327496257a@gmail.com`

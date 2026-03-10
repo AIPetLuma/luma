@@ -7,6 +7,8 @@
 | `app/test/core/need_system_test.dart` | Need evolution over time, interaction effects, threshold helpers | 需求值随时间变化、交互影响、阈值判断 |
 | `app/test/core/emotion_system_test.dart` | Emotion drift, event reaction, label mapping, token tuning | 情绪漂移、事件响应、标签映射、回复长度策略 |
 | `app/test/core/life_engine_test.dart` | Offline simulation, reunion mood, diary generation, cap logic | 离线模拟、重逢情绪、日记生成、上限保护 |
+| `app/test/core/self_model_test.dart` | Self model roundtrip, reflection update, storage | 自我模型序列化、反思更新、存取验证 |
+| `app/test/core/crisis_gate_test.dart` | L3 crisis gate blocks autonomous reply/reflect | L3 危机门禁阻断自主回复与反思 |
 | `app/test/core/crisis_detector_test.dart` | Risk level detection (L0-L3), EN/CN keywords, resource templates | 风险分级检测（L0-L3）、中英关键词、资源文案 |
 | `app/test/features/crisis_card_test.dart` | Crisis card rendering by risk level and emergency affordance | 不同风险等级危机卡片渲染与紧急动作 |
 | `app/test/features/onboarding_test.dart` | Disclosure gate, birth selection gating, naming validation | 披露页门禁、性格选择门禁、命名输入校验 |
@@ -37,5 +39,5 @@
 
 - `flutter test`: passing (full suite).
 - `flutter test`：全量通过。
-- `flutter analyze`: no blocking error; warnings/info remain for cleanup.
-- `flutter analyze`：无阻塞错误；仍有 warning/info 可继续清理。
+- `flutter analyze`: no issues found.
+- `flutter analyze`：无问题。

@@ -67,11 +67,6 @@ void main() {
     });
 
     test('curiosity peaks during afternoon', () {
-      final initial = Needs(curiosity: 0.5);
-      // Morning tick (10 AM)
-      final morningResult = system.tickAt(initial, 60, hourOfDay: 10);
-      // Late night (2 AM) — curiosity should drift less positively
-      final nightResult = system.tickAt(initial, 60, hourOfDay: 2);
       // Run multiple times and check average to account for randomness
       double morningAvg = 0;
       double nightAvg = 0;

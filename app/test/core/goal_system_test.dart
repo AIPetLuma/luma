@@ -88,7 +88,7 @@ void main() {
 
   group('Goal progress and completion', () {
     test('chat interaction advances social goal', () {
-      final goal = Goal(
+      const goal = Goal(
         type: GoalType.social,
         description: 'Chat with owner',
         progress: 0.0,
@@ -100,7 +100,7 @@ void main() {
     });
 
     test('goal completes at progress 1.0', () {
-      final goal = Goal(
+      const goal = Goal(
         type: GoalType.social,
         description: 'Chat with owner',
         progress: 0.9,
@@ -112,7 +112,7 @@ void main() {
     });
 
     test('completed goal produces positive emotion delta', () {
-      final goal = Goal(
+      const goal = Goal(
         type: GoalType.social,
         description: 'Chat with owner',
         progress: 1.0,
@@ -124,7 +124,7 @@ void main() {
     });
 
     test('failed goal produces negative emotion delta', () {
-      final goal = Goal(
+      const goal = Goal(
         type: GoalType.social,
         description: 'Chat with owner',
         progress: 0.2,
