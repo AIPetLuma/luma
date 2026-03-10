@@ -1,8 +1,12 @@
 import 'dart:convert';
 import '../../core/engine/life_engine.dart';
-import '../../core/engine/need_system.dart';
 import '../../core/engine/emotion_system.dart';
+import '../../core/engine/need_system.dart';
+import '../../core/engine/goal_system.dart';
+import '../../core/engine/internal_monologue.dart';
+import '../../core/engine/reflection_engine.dart';
 import '../../core/memory/memory_manager.dart';
+import '../../core/memory/self_model_store.dart';
 import '../../core/safety/crisis_detector.dart';
 import '../../core/safety/audit_logger.dart';
 import '../../data/local/chat_dao.dart';
@@ -28,6 +32,10 @@ const kChatWarningLlmUnknown = 'llm_unknown';
 class ChatController {
   final LifeEngine _engine;
   final MemoryManager _memory;
+  final SelfModelStore _selfModelStore;
+  final GoalSystem _goalSystem;
+  final InternalMonologue _monologue;
+  final ReflectionEngine _reflectionEngine;
   final CrisisDetector _crisisDetector;
   final AuditLogger _auditLogger;
   final LlmClient _llm;
@@ -36,16 +44,24 @@ class ChatController {
   ChatController({
     required LifeEngine engine,
     required MemoryManager memory,
+    required SelfModelStore selfModelStore,
     required CrisisDetector crisisDetector,
     required AuditLogger auditLogger,
     required LlmClient llm,
     required ChatDao chatDao,
+    GoalSystem? goalSystem,
+    InternalMonologue? monologue,
+    ReflectionEngine? reflectionEngine,
   })  : _engine = engine,
         _memory = memory,
+        _selfModelStore = selfModelStore,
         _crisisDetector = crisisDetector,
         _auditLogger = auditLogger,
         _llm = llm,
-        _chatDao = chatDao;
+        _chatDao = chatDao,
+        _goalSystem = goalSystem ?? GoalSystem(),
+        _monologue = monologue ?? InternalMonologue(),
+        _reflectionEngine = reflectionEngine ?? ReflectionEngine();
 
   /// Process a user message and return the pet's response.
   ///
@@ -156,6 +172,7 @@ class ChatController {
 
     // ── 5. Update engine state ──
     _engine.onUserInteraction(InteractionType.chat);
+    await _reflectIfNeeded(state, riskLevel: riskLevel, trigger: 'chat');
 
     // ── 6. L1 soft resource hint ──
     String? softHint;
@@ -182,6 +199,17 @@ class ChatController {
   /// Build the system prompt with full state context.
   Future<String> _buildSystemPrompt(PetState state, {bool crisis = false}) async {
     final memoryContext = await _memory.buildContextForPrompt(state.id);
+    final goals = _goalSystem.generateGoals(
+      needs: state.needs,
+      emotion: state.emotion,
+      personality: state.personality,
+    );
+    final thought = _monologue.generate(
+      needs: state.needs,
+      emotion: state.emotion,
+      goals: goals,
+    );
+    final selfModel = await _selfModelStore.load(state.id);
 
     final buffer = StringBuffer();
 
@@ -219,6 +247,23 @@ class ChatController {
       buffer.writeln();
     }
 
+    if (selfModel != null) {
+      buffer.writeln('=== Self model ===');
+      buffer.writeln(selfModel.toPromptFragment());
+      buffer.writeln();
+    }
+
+    if (goals.isNotEmpty) {
+      buffer.writeln('=== Current goals ===');
+      for (final goal in goals.take(2)) {
+        buffer.writeln('- ${goal.description} (priority ${(goal.priority * 100).round()}%)');
+      }
+      buffer.writeln();
+    }
+
+    buffer.writeln(thought.toPromptFragment());
+    buffer.writeln();
+
     // Behaviour rules.
     buffer.writeln('=== Behaviour rules ===');
     buffer.writeln('- Never claim to be human. If asked, say you are an AI pet.');
@@ -235,6 +280,35 @@ class ChatController {
     }
 
     return buffer.toString();
+  }
+
+  Future<void> _reflectIfNeeded(
+    PetState state, {
+    required int riskLevel,
+    required String trigger,
+  }) async {
+    if (riskLevel >= 2) return;
+
+    final goals = _goalSystem.generateGoals(
+      needs: state.needs,
+      emotion: state.emotion,
+      personality: state.personality,
+    );
+    final thought = _monologue.generate(
+      needs: state.needs,
+      emotion: state.emotion,
+      goals: goals,
+    );
+    final existing = await _selfModelStore.load(state.id);
+    final result = _reflectionEngine.reflect(
+      state: state,
+      goals: goals,
+      thought: thought,
+      trigger: trigger,
+      previous: existing,
+    );
+    await _selfModelStore.save(state.id, result.model);
+    await _selfModelStore.recordReflection(state.id, result.record);
   }
 
   Future<String> _generateReply(

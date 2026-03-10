@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/engine/life_engine.dart';
 import '../core/identity/pet_identity.dart';
 import '../core/memory/memory_manager.dart';
+import '../core/memory/self_model_store.dart';
+import '../core/engine/reflection_engine.dart';
 import '../core/safety/audit_logger.dart';
 import '../core/safety/crisis_detector.dart';
 import '../core/services/notification_service.dart';
@@ -80,16 +82,26 @@ final memoryManagerProvider = Provider((ref) {
   );
 });
 
+final selfModelStoreProvider = Provider((ref) {
+  return SelfModelStore(
+    dao: ref.watch(memoryDaoProvider),
+  );
+});
+
+final reflectionEngineProvider = Provider((_) => ReflectionEngine());
+
 // ── Chat Controller ──
 
 final chatControllerProvider = Provider((ref) {
   return ChatController(
     engine: ref.watch(lifeEngineProvider),
     memory: ref.watch(memoryManagerProvider),
+    selfModelStore: ref.watch(selfModelStoreProvider),
     crisisDetector: ref.watch(crisisDetectorProvider),
     auditLogger: ref.watch(auditLoggerProvider),
     llm: ref.watch(llmClientProvider),
     chatDao: ref.watch(chatDaoProvider),
+    reflectionEngine: ref.watch(reflectionEngineProvider),
   );
 });
 

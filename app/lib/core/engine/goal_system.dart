@@ -21,14 +21,14 @@ class GoalSystem {
 
     // Exhausted pet only generates rest/comfort goals
     if (needs.fatigue >= 0.85) {
-      candidates.add(Goal(
+      candidates.add(const Goal(
         type: GoalType.rest,
         description: 'Find a quiet moment to rest',
         progress: 0.0,
         priority: 0.9,
       ));
       if (needs.security < 0.4) {
-        candidates.add(Goal(
+        candidates.add(const Goal(
           type: GoalType.comfort,
           description: 'Seek reassurance from owner',
           progress: 0.0,

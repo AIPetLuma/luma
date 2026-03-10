@@ -145,7 +145,7 @@ class InternalMonologue {
   }
 
   Thought _idleThought() {
-    return Thought(
+    return const Thought(
       content: 'Just quietly being here, feeling the moment.',
       trigger: ThoughtTrigger.idle,
       emotionalWeight: 0.1,

@@ -39,6 +39,23 @@ class MemoryDao {
     return rows.map(MemoryEntry.fromMap).toList();
   }
 
+  /// Get latest long-term memories by content prefix.
+  Future<List<MemoryEntry>> getLongTermByPrefix(
+    String petId,
+    String prefix, {
+    int limit = 5,
+  }) async {
+    final db = await _db;
+    final rows = await db.query(
+      'memories',
+      where: 'pet_id = ? AND level = ? AND content LIKE ?',
+      whereArgs: [petId, MemoryLevel.longTerm.index, '$prefix%'],
+      orderBy: 'created_at DESC',
+      limit: limit,
+    );
+    return rows.map(MemoryEntry.fromMap).toList();
+  }
+
   /// Delete expired short-term memories.
   Future<int> deleteExpired() async {
     final db = await _db;

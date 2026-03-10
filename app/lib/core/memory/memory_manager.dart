@@ -3,6 +3,7 @@ import '../../data/models/memory_entry.dart';
 import '../../data/models/chat_message.dart';
 import '../../data/remote/llm_client.dart';
 import '../../shared/constants.dart';
+import 'self_model_store.dart';
 
 /// Three-layer memory system that gives Luma persistent identity.
 ///
@@ -33,6 +34,10 @@ class MemoryManager {
     if (longTerm.isNotEmpty) {
       buffer.writeln('=== Important memories ===');
       for (final m in longTerm) {
+        if (m.content.startsWith(SelfModelStore.selfModelPrefix) ||
+            m.content.startsWith(SelfModelStore.reflectionPrefix)) {
+          continue;
+        }
         buffer.writeln('- ${m.content}');
       }
     }

@@ -59,9 +59,9 @@ echo '=== Luma P1 Release Readiness Check ==='
 
 check_file "$ROOT_DIR/legal/privacy_policy.md" "Privacy policy exists"
 check_file "$ROOT_DIR/legal/terms_of_service.md" "Terms of service exists"
-check_file "$ROOT_DIR/reports/app_store_play_console_ops_checklist.md" "Store console checklist exists"
-check_file "$ROOT_DIR/reports/p1_release_readiness.md" "P1 readiness plan exists"
-check_file "$ROOT_DIR/reports/store_listing_copy_template.md" "Store listing copy template exists"
+check_file "$ROOT_DIR/docs/reports/app_store_play_console_ops_checklist.md" "Store console checklist exists"
+check_file "$ROOT_DIR/docs/reports/p1_release_readiness.md" "P1 readiness plan exists"
+check_file "$ROOT_DIR/docs/reports/store_listing_copy_template.md" "Store listing copy template exists"
 
 if contains 'namespace = "ai\.luma\.app"' "$APP_DIR/android/app/build.gradle.kts" &&
   contains 'applicationId = "ai\.luma\.app"' "$APP_DIR/android/app/build.gradle.kts"; then

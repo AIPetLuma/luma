@@ -74,7 +74,7 @@ void main() {
       final needs = Needs(loneliness: 0.5, curiosity: 0.7);
       final emotion = Emotion(valence: 0.2, arousal: 0.5);
       final goals = [
-        Goal(
+        const Goal(
           type: GoalType.exploration,
           description: 'Learn about the stars',
           progress: 0.3,
